@@ -1,0 +1,52 @@
+		(1)
+VARIABLES	LABELS	Random Effects (Appendix)
+		
+vix	vix	-0.0251***
+		(0.0055)
+fed_3m_forward	fed_3m_forward	0.0665
+		(0.0525)
+usd_brl	usd_brl	0.4420***
+		(0.1227)
+gdp_yoy	gdp_yoy	-0.0955***
+		(0.0180)
+debt_gdp	debt_gdp	0.1029
+		(0.0630)
+cf_cash_oper_to_tot_asset	cf_cash_oper_to_tot_asset	0.0013
+		(0.0049)
+amount_issued_to_bs_tot_asset	amount_issued_to_bs_tot_asset	-0.0340*
+		(0.0202)
+tot_debt_to_ebitda	tot_debt_to_ebitda	0.0009
+		(0.0017)
+days_to_maturity	days_to_maturity	0.0643
+		(0.0857)
+synthetic_cds_brl	synthetic_cds_brl	-0.0967**
+		(0.0456)
+1o.bond_type_cat	bond_type_cat = 1, omitted	-
+		
+2.sector_cat	sector_cat = 2, Electric	-0.6344
+		(0.8993)
+3.sector_cat	sector_cat = 3, Energy-Alternate Sources	-0.9650
+		(0.9604)
+4.sector_cat	sector_cat = 4, Food	0.3400
+		(0.6653)
+5.sector_cat	sector_cat = 5, Forest Products&Paper	-0.4262
+		(0.9679)
+6.sector_cat	sector_cat = 6, Gas	-0.4772
+		(0.8777)
+7.sector_cat	sector_cat = 7, Home Builders	-1.2694*
+		(0.6709)
+8.sector_cat	sector_cat = 8, Iron/Steel	-0.6991
+		(1.0227)
+9.sector_cat	sector_cat = 9, Oil&Gas	-1.7486*
+		(1.0248)
+10.sector_cat	sector_cat = 10, Packaging&Containers	-1.0283
+		(1.3617)
+11.sector_cat	sector_cat = 11, Pharmaceuticals	-2.1022***
+		(0.6711)
+12.sector_cat	sector_cat = 12, Transportation	-1.8358
+		(1.7316)
+		
+Observations		4,229
+Number of bond_id		103
+Robust standard errors in parentheses		
+*** p<0.01, ** p<0.05, * p<0.1		

@@ -1,0 +1,11 @@
+# requirements.txt
+pandas>=1.5
+numpy>=1.21
+scipy>=1.7
+plotly>=5.10
+openpyxl>=3.0
+pytest>=6.0
+flask>=2.0
+matplotlib>=3.0
+XlsxWriter>=3.0.0
+tqdm>=4.66

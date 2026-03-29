@@ -1,0 +1,81 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Home | Modelo de Spreads{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <p class="subtitle">1993–2025 · Brasil · Deuda corporativa en BRL</p>
+  <h1>Modelo de spreads de bonos corporativos</h1>
+</section>
+
+<main>
+  <div class="grid">
+    <article class="card span-7">
+      <h3>Resumen del estudio</h3>
+      <p>
+        Este trabajo analiza los <strong>determinantes de los spreads de deuda corporativa</strong> en Brasil entre 1993 y 2025,
+        enfocado en el mercado local en reales. El spread se define como la diferencia entre el
+        <em>yield to maturity</em> del bono corporativo y el rendimento de uma referência soberana ou livre de risco de igual prazo.
+      </p>
+      <p class="muted">
+        Los spreads reflejan prima por riesgo de default, iliquidez y otros factores idiosincráticos, además de componentes
+        sistémicos propios de economías emergentes: riesgo soberano, condiciones financieras globales y el entorno macro
+        doméstico.
+      </p>
+    </article>
+
+    <aside class="card span-5">
+      <h3>Determinantes y canales</h3>
+      <ul class="list">
+        <li><strong>Globales:</strong> liquidez internacional, tasas externas, apetito por riesgo, shocks externos.</li>
+        <li><strong>Soberanos:</strong> riesgo país, curva de referência, credibilidade fiscal e monetária.</li>
+        <li><strong>Macroeconômicos:</strong> inflação, brecha del producto, tipo de cambio, prima de plazo.</li>
+        <li><strong>Idiosincráticos:</strong> riesgo de firma, sector, duración, covenants, liquidez del bono.</li>
+      </ul>
+      <p class="muted">
+        Hipótesis: shocks globales y soberanos afectan el nivel de spreads; los factores macro locales ajustan pendiente y curvatura.
+      </p>
+    </aside>
+
+    <section class="card span-6">
+      <h3>Nota metodológica</h3>
+      <p>
+        El modelo utiliza <em>yields</em> ponto en el tiempo y factores estructurales para analizar la sensibilidad de los spreads.
+        Cubre eventos de crisis, reformas estructurales y el desarrollo del mercado corporativo en reales.
+      </p>
+    </section>
+
+    <section class="card span-6">
+      <h3>Log de Filtragem – DI</h3>
+      <pre style="font-size: 0.95rem; background: #0f172a; color: #e5e7eb; padding: 12px; border-radius: 10px;">
+    {{ logs_di }}
+      </pre>
+    </section>
+
+    <section class="card span-6">
+      <h3>Log de Filtragem – IPCA</h3>
+      <pre style="font-size: 0.95rem; background: #0f172a; color: #e5e7eb; padding: 12px; border-radius: 10px;">
+    {{ logs_ipca }}
+      </pre>
+    </section>
+
+    <p>No todos los bonos aparecen en el informe final de spreads calculados. Esto puede ocurrir debido a:</p>
+      <ol>
+          <li>Falta de liquidez o de datos de yield en <code>ya.xlsx</code> en el período de observación</li>
+          <li>Ausencia de curva DI/WLA para la fecha correspondiente</li>
+          <li>Spreads extremos (fuera del intervalo [-10, 10])</li>
+          <li>Problemas en la interpolación (tenor_bucket ausente, ventana insuficiente, etc.)</li>
+      </ol>
+    <p>Como resultado, la hoja final contiene únicamente las observaciones válidas.</p>
+
+  </div>
+</main>
+
+<footer>
+  · Proyecto académico · Brasil – Spreads corporativos (BRL)
+</footer>
+{% endblock %}

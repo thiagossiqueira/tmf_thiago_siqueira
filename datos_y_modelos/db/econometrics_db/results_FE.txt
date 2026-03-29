@@ -1,0 +1,57 @@
+		(1)
+VARIABLES	LABELS	Fixed Effects (Robust Clustered by Issuer)
+		
+vix	vix	-0.0262***
+		(0.0052)
+fed_3m_forward	fed_3m_forward	0.1297***
+		(0.0466)
+usd_brl	usd_brl	0.7029***
+		(0.1761)
+gdp_yoy	gdp_yoy	-0.0745***
+		(0.0215)
+debt_gdp	debt_gdp	0.1048*
+		(0.0594)
+cf_cash_oper_to_tot_asset	cf_cash_oper_to_tot_asset	0.0006
+		(0.0051)
+amount_issued_to_bs_tot_asset	amount_issued_to_bs_tot_asset	-0.1017**
+		(0.0438)
+tot_debt_to_ebitda	tot_debt_to_ebitda	0.0007
+		(0.0015)
+days_to_maturity	days_to_maturity	0.2023
+		(0.1588)
+synthetic_cds_brl	synthetic_cds_brl	-0.1233**
+		(0.0559)
+1o.bond_type_cat	bond_type_cat = 1, omitted	-
+		
+2o.sector_cat	sector_cat = 2, omitted	-
+		
+3o.sector_cat	sector_cat = 3, omitted	-
+		
+4o.sector_cat	sector_cat = 4, omitted	-
+		
+5o.sector_cat	sector_cat = 5, omitted	-
+		
+6o.sector_cat	sector_cat = 6, omitted	-
+		
+7o.sector_cat	sector_cat = 7, omitted	-
+		
+8o.sector_cat	sector_cat = 8, omitted	-
+		
+9o.sector_cat	sector_cat = 9, omitted	-
+		
+10o.sector_cat	sector_cat = 10, omitted	-
+		
+11o.sector_cat	sector_cat = 11, omitted	-
+		
+12o.sector_cat	sector_cat = 12, omitted	-
+		
+		
+Observations		4,229
+Number of bond_id		103
+R-squared		0.1205
+N bonds		e(N_g
+,		,
+)		
+R-sq (within)		0.121
+Robust standard errors in parentheses		
+*** p<0.01, ** p<0.05, * p<0.1		

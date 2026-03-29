@@ -1,0 +1,45 @@
+body > table {
+    width: 80%;
+}
+
+table {
+    border-collapse: collapse;
+}
+table.list {
+    width: 100%;
+}
+
+td, th {
+    border: 1px solid #ddd;
+    text-align: left;
+    padding: 8px;
+}
+
+tr:nth-child(even), table.list thead>tr {
+    background-color: #ddd;
+}
+
+input[type=text], input[type=number] {
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+input[type=submit] {
+    width: 30%;
+    padding: 14px 20px;
+    background-color: #ddd;
+    border: none;
+    border-radius: 4px;
+}
+
+form div.form-action-buttons {
+    text-align: right;
+}
+
+a {
+    color: #0000ee;
+    text-decoration: underline;
+}

@@ -1,0 +1,140 @@
+{% extends "shared/base.html" %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <h2 class="mb-3">Real IPCA Curve Surface (WLA + NTNB)</h2>
+    <p class="text-muted">Curva real soberana construída via WLA (0–5 anos) + NTNB (5–30 anos)</p>
+
+    <!-- Curve selector -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Selecione o dataset:</label>
+            <select id="datasetSelect" class="form-select">
+                <option value="merged">Corporate + Government (merged)</option>
+                <option value="corp">Somente Corporate</option>
+                <option value="govt">Somente Government</option>
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Tipo de visualização:</label>
+            <select id="viewModeSelect" class="form-select">
+                <option value="surface">3D Surface</option>
+                <option value="heatmap">Heatmap</option>
+                <option value="line">Line slices</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Main 3D Chart -->
+    <div id="curveChart" style="height: 600px;"></div>
+
+    <hr class="my-4">
+
+    <h3>Matching 5 anos (WLA → NTNB)</h3>
+    <p class="text-muted">Transição suave entre a perna curta (WLA) e a perna longa (NTNB).</p>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h5>WLA (0–5y)</h5>
+            <div id="wlaChart" style="height: 350px;"></div>
+        </div>
+
+        <div class="col-md-6">
+            <h5>NTNB (5–30y)</h5>
+            <div id="ntnbChart" style="height: 350px;"></div>
+        </div>
+    </div>
+
+    <hr class="my-4">
+    <h3>Curva Real Combinada</h3>
+    <div id="combinedChart" style="height: 350px;"></div>
+
+</div>
+
+<script>
+    // JSON from Flask
+    const curveData = {{ surface_json | safe }};
+    const corpData = {{ corp_json | safe }};
+    const govtData = {{ govt_json | safe }};
+    const wlaData = {{ wla_json | safe }};
+    const ntnbData = {{ ntnb_json | safe }};
+    const combinedData = {{ combined_json | safe }};
+
+    function plotCurve(dataset="merged", mode="surface") {
+        let dataToUse = (dataset === "corp") ? corpData :
+                        (dataset === "govt") ? govtData :
+                        curveData;
+
+        if (!dataToUse.length) { return; }
+
+        const x = Object.keys(dataToUse[0]).filter(k => k !== "obs_date");
+        const y = dataToUse.map(r => r["obs_date"]);
+        const z = dataToUse.map(r => x.map(k => r[k]));
+
+        let plotlyData = [];
+        if (mode === "surface") {
+            plotlyData.push({
+                x: x, y: y, z: z,
+                type: "surface",
+                colorscale: "Viridis"
+            });
+        } else if (mode === "heatmap") {
+            plotlyData.push({
+                x: x, y: y, z: z,
+                type: "heatmap",
+                colorscale: "Viridis"
+            });
+        } else {
+            for (let i = 0; i < Math.min(25, y.length); i++) {
+                plotlyData.push({
+                    x: x,
+                    y: z[i],
+                    mode: "lines",
+                    name: y[i]
+                });
+            }
+        }
+
+        Plotly.newPlot("curveChart", plotlyData, {
+            title: "Real IPCA Surface",
+        });
+    }
+
+    function plotMatching() {
+        Plotly.newPlot("wlaChart", [{
+            x: wlaData.tenors,
+            y: wlaData.yields,
+            mode: "lines+markers"
+        }], {title:"WLA (0–5y)"});
+
+        Plotly.newPlot("ntnbChart", [{
+            x: ntnbData.tenors,
+            y: ntnbData.yields,
+            mode: "lines+markers"
+        }], {title:"NTNB (5–30y)"});
+
+        Plotly.newPlot("combinedChart", [{
+            x: combinedData.tenors,
+            y: combinedData.yields,
+            mode: "lines+markers"
+        }], {title:"Combined"});
+    }
+
+    // Events
+    document.getElementById("datasetSelect").addEventListener("change", () => {
+        plotCurve(datasetSelect.value, viewModeSelect.value);
+    });
+
+    document.getElementById("viewModeSelect").addEventListener("change", () => {
+        plotCurve(datasetSelect.value, viewModeSelect.value);
+    });
+
+    // INITIAL LOAD
+    plotCurve("merged", "surface");
+    plotMatching();
+</script>
+
+{% endblock %}

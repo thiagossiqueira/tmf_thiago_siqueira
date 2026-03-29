@@ -1,0 +1,46 @@
+{\rtf1\fs24
+\trowd\trgaph75\trleft-75\intbl\trqc\clbrdrt\brdrs\cellx4320\clbrdrt\brdrs\cellx5904\clbrdrt\brdrs\cellx7344\clbrdrt\brdrs\cellx8928\clbrdrt\brdrs\cellx10368\clbrdrt\brdrs\cellx11952
+\ql \cell\qc (1)\cell\qc (2)\cell\qc (3)\cell\qc (4)\cell\qc (5)\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx4320\cellx5904\cellx7344\cellx8928\cellx10368\cellx11952
+\trowd\trgaph75\trleft-75\trqc\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx5904\clbrdrb\brdrs\cellx7344\clbrdrb\brdrs\cellx8928\clbrdrb\brdrs\cellx10368\clbrdrb\brdrs\cellx11952
+\ql VARIABLES\cell\qc FE\cell\qc FE-UR\cell\qc FE-LAG\cell\qc PCSE\cell\qc DK\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx4320\cellx5904\cellx7344\cellx8928\cellx10368\cellx11952
+\ql \cell\qc \cell\qc \cell\qc \cell\qc \cell\qc \cell\row
+\ql vix\cell\qc -0.0262***\cell\qc 0.0046\cell\qc -0.0075***\cell\qc -0.0248*\cell\qc -0.0262*\cell\row
+\ql \cell\qc (0.0052)\cell\qc (0.0083)\cell\qc (0.0025)\cell\qc (0.0141)\cell\qc (0.0155)\cell\row
+\ql fed_3m_forward\cell\qc 0.1297***\cell\qc \cell\qc -0.0145**\cell\qc 0.1369***\cell\qc 0.1297\cell\row
+\ql \cell\qc (0.0466)\cell\qc \cell\qc (0.0062)\cell\qc (0.0482)\cell\qc (0.0922)\cell\row
+\ql usd_brl\cell\qc 0.7029***\cell\qc \cell\qc 0.1238***\cell\qc 0.5067***\cell\qc 0.7029**\cell\row
+\ql \cell\qc (0.1761)\cell\qc \cell\qc (0.0292)\cell\qc (0.1005)\cell\qc (0.3426)\cell\row
+\ql gdp_yoy\cell\qc -0.0745***\cell\qc -0.0868*\cell\qc 0.0189***\cell\qc -0.0614*\cell\qc -0.0745**\cell\row
+\ql \cell\qc (0.0215)\cell\qc (0.0455)\cell\qc (0.0068)\cell\qc (0.0326)\cell\qc (0.0351)\cell\row
+\ql debt_gdp\cell\qc 0.1048*\cell\qc \cell\qc -0.0047\cell\qc 0.1077***\cell\qc 0.1048**\cell\row
+\ql \cell\qc (0.0594)\cell\qc \cell\qc (0.0065)\cell\qc (0.0369)\cell\qc (0.0519)\cell\row
+\ql cf_cash_oper_to_tot_asset\cell\qc 0.0006\cell\qc 0.0025\cell\qc 0.0005\cell\qc 0.0091***\cell\qc 0.0006\cell\row
+\ql \cell\qc (0.0051)\cell\qc (0.0055)\cell\qc (0.0005)\cell\qc (0.0024)\cell\qc (0.0036)\cell\row
+\ql amount_issued_to_bs_tot_asset\cell\qc -0.1017**\cell\qc -0.0959**\cell\qc -0.0075\cell\qc 0.0067***\cell\qc -0.1017***\cell\row
+\ql \cell\qc (0.0438)\cell\qc (0.0431)\cell\qc (0.0050)\cell\qc (0.0025)\cell\qc (0.0164)\cell\row
+\ql tot_debt_to_ebitda\cell\qc 0.0007\cell\qc 0.0003\cell\qc 0.0003\cell\qc 0.0001\cell\qc 0.0007\cell\row
+\ql \cell\qc (0.0015)\cell\qc (0.0012)\cell\qc (0.0003)\cell\qc (0.0011)\cell\qc (0.0010)\cell\row
+\ql days_to_maturity\cell\qc 0.2023\cell\qc -0.0410\cell\qc 0.0290\cell\qc 0.0471***\cell\qc 0.2023\cell\row
+\ql \cell\qc (0.1588)\cell\qc (0.1083)\cell\qc (0.0193)\cell\qc (0.0175)\cell\qc (0.1296)\cell\row
+\ql synthetic_cds_brl\cell\qc -0.1233**\cell\qc -0.1222**\cell\qc -0.0045\cell\qc -0.0315**\cell\qc -0.1233***\cell\row
+\ql \cell\qc (0.0559)\cell\qc (0.0586)\cell\qc (0.0074)\cell\qc (0.0126)\cell\qc (0.0342)\cell\row
+\ql D_fed_3m_forward\cell\qc \cell\qc 0.6270\cell\qc \cell\qc \cell\qc \cell\row
+\ql \cell\qc \cell\qc (0.5045)\cell\qc \cell\qc \cell\qc \cell\row
+\ql D_usd_brl\cell\qc \cell\qc -0.1860\cell\qc \cell\qc \cell\qc \cell\row
+\ql \cell\qc \cell\qc (0.2024)\cell\qc \cell\qc \cell\qc \cell\row
+\ql D_debt_gdp\cell\qc \cell\qc 0.0337\cell\qc \cell\qc \cell\qc \cell\row
+\ql \cell\qc \cell\qc (0.0900)\cell\qc \cell\qc \cell\qc \cell\row
+\ql L_spread\cell\qc \cell\qc \cell\qc 0.9045***\cell\qc \cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\qc (0.0193)\cell\qc \cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\qc \cell\qc \cell\qc \cell\row
+\ql Observations\cell\qc 4,229\cell\qc 4,158\cell\qc 4,043\cell\qc 4,229\cell\qc 4,229\cell\row
+\ql R-squared\cell\qc 0.1205\cell\qc 0.1053\cell\qc 0.8321\cell\qc 0.2655\cell\qc \cell\row
+\ql Number of bond_id\cell\qc 103\cell\qc 103\cell\qc 102\cell\qc 103\cell\qc \cell\row
+\trowd\trgaph75\trleft-75\trqc\trbrdrb\brdrs\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx5904\clbrdrb\brdrs\cellx7344\clbrdrb\brdrs\cellx8928\clbrdrb\brdrs\cellx10368\clbrdrb\brdrs\cellx11952
+\ql Number of groups\cell\qc \cell\qc \cell\qc \cell\qc \cell\qc 103\cell\row
+\pard\qc
+Robust standard errors in parentheses\par
+*** p<0.01, ** p<0.05, * p<0.1\par
+}

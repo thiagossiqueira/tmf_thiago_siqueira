@@ -1,0 +1,60 @@
+{\rtf1\fs24
+\trowd\trgaph75\trleft-75\intbl\trqc\clbrdrt\brdrs\cellx5904\clbrdrt\brdrs\cellx9648
+\ql \cell\qc (1)\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx5904\cellx9648
+\trowd\trgaph75\trleft-75\trqc\clbrdrb\brdrs\cellx5904\clbrdrb\brdrs\cellx9648
+\ql VARIABLES\cell\qc Random Effects (Appendix)\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx5904\cellx9648
+\ql \cell\qc \cell\row
+\ql vix\cell\qc -0.0251***\cell\row
+\ql \cell\qc (0.0055)\cell\row
+\ql fed_3m_forward\cell\qc 0.0665\cell\row
+\ql \cell\qc (0.0525)\cell\row
+\ql usd_brl\cell\qc 0.4420***\cell\row
+\ql \cell\qc (0.1227)\cell\row
+\ql gdp_yoy\cell\qc -0.0955***\cell\row
+\ql \cell\qc (0.0180)\cell\row
+\ql debt_gdp\cell\qc 0.1029\cell\row
+\ql \cell\qc (0.0630)\cell\row
+\ql cf_cash_oper_to_tot_asset\cell\qc 0.0013\cell\row
+\ql \cell\qc (0.0049)\cell\row
+\ql amount_issued_to_bs_tot_asset\cell\qc -0.0340*\cell\row
+\ql \cell\qc (0.0202)\cell\row
+\ql tot_debt_to_ebitda\cell\qc 0.0009\cell\row
+\ql \cell\qc (0.0017)\cell\row
+\ql days_to_maturity\cell\qc 0.0643\cell\row
+\ql \cell\qc (0.0857)\cell\row
+\ql synthetic_cds_brl\cell\qc -0.0967**\cell\row
+\ql \cell\qc (0.0456)\cell\row
+\ql bond_type_cat = 1, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 2, Electric\cell\qc -0.6344\cell\row
+\ql \cell\qc (0.8993)\cell\row
+\ql sector_cat = 3, Energy-Alternate Sources\cell\qc -0.9650\cell\row
+\ql \cell\qc (0.9604)\cell\row
+\ql sector_cat = 4, Food\cell\qc 0.3400\cell\row
+\ql \cell\qc (0.6653)\cell\row
+\ql sector_cat = 5, Forest Products&Paper\cell\qc -0.4262\cell\row
+\ql \cell\qc (0.9679)\cell\row
+\ql sector_cat = 6, Gas\cell\qc -0.4772\cell\row
+\ql \cell\qc (0.8777)\cell\row
+\ql sector_cat = 7, Home Builders\cell\qc -1.2694*\cell\row
+\ql \cell\qc (0.6709)\cell\row
+\ql sector_cat = 8, Iron/Steel\cell\qc -0.6991\cell\row
+\ql \cell\qc (1.0227)\cell\row
+\ql sector_cat = 9, Oil&Gas\cell\qc -1.7486*\cell\row
+\ql \cell\qc (1.0248)\cell\row
+\ql sector_cat = 10, Packaging&Containers\cell\qc -1.0283\cell\row
+\ql \cell\qc (1.3617)\cell\row
+\ql sector_cat = 11, Pharmaceuticals\cell\qc -2.1022***\cell\row
+\ql \cell\qc (0.6711)\cell\row
+\ql sector_cat = 12, Transportation\cell\qc -1.8358\cell\row
+\ql \cell\qc (1.7316)\cell\row
+\ql \cell\qc \cell\row
+\ql Observations\cell\qc 4,229\cell\row
+\trowd\trgaph75\trleft-75\trqc\trbrdrb\brdrs\clbrdrb\brdrs\cellx5904\clbrdrb\brdrs\cellx9648
+\ql Number of bond_id\cell\qc 103\cell\row
+\pard\qc
+Robust standard errors in parentheses\par
+*** p<0.01, ** p<0.05, * p<0.1\par
+}

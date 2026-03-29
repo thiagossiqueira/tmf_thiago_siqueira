@@ -1,0 +1,65 @@
+{\rtf1\fs24
+\trowd\trgaph75\trleft-75\intbl\trqc\clbrdrt\brdrs\cellx4320\clbrdrt\brdrs\cellx10512
+\ql \cell\qc (1)\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx4320\cellx10512
+\trowd\trgaph75\trleft-75\trqc\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx10512
+\ql VARIABLES\cell\qc Fixed Effects (Robust Clustered by Issuer)\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx4320\cellx10512
+\ql \cell\qc \cell\row
+\ql vix\cell\qc -0.0262***\cell\row
+\ql \cell\qc (0.0052)\cell\row
+\ql fed_3m_forward\cell\qc 0.1297***\cell\row
+\ql \cell\qc (0.0466)\cell\row
+\ql usd_brl\cell\qc 0.7029***\cell\row
+\ql \cell\qc (0.1761)\cell\row
+\ql gdp_yoy\cell\qc -0.0745***\cell\row
+\ql \cell\qc (0.0215)\cell\row
+\ql debt_gdp\cell\qc 0.1048*\cell\row
+\ql \cell\qc (0.0594)\cell\row
+\ql cf_cash_oper_to_tot_asset\cell\qc 0.0006\cell\row
+\ql \cell\qc (0.0051)\cell\row
+\ql amount_issued_to_bs_tot_asset\cell\qc -0.1017**\cell\row
+\ql \cell\qc (0.0438)\cell\row
+\ql tot_debt_to_ebitda\cell\qc 0.0007\cell\row
+\ql \cell\qc (0.0015)\cell\row
+\ql days_to_maturity\cell\qc 0.2023\cell\row
+\ql \cell\qc (0.1588)\cell\row
+\ql synthetic_cds_brl\cell\qc -0.1233**\cell\row
+\ql \cell\qc (0.0559)\cell\row
+\ql bond_type_cat = 1, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 2, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 3, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 4, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 5, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 6, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 7, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 8, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 9, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 10, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 11, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql sector_cat = 12, omitted\cell\qc -\cell\row
+\ql \cell\qc \cell\row
+\ql \cell\qc \cell\row
+\ql Observations\cell\qc 4,229\cell\row
+\ql Number of bond_id\cell\qc 103\cell\row
+\ql R-squared\cell\qc 0.1205\cell\row
+\ql N bonds\cell\qc e(N_g\cell\row
+\ql ,\cell\qc ,\cell\row
+\ql )\cell\qc \cell\row
+\trowd\trgaph75\trleft-75\trqc\trbrdrb\brdrs\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx10512
+\ql R-sq (within)\cell\qc 0.121\cell\row
+\pard\qc
+Robust standard errors in parentheses\par
+*** p<0.01, ** p<0.05, * p<0.1\par
+}
