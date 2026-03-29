@@ -3,7 +3,7 @@ capture log close
 set more off
 version 15
 
-global base "C:\Users\tsiqueira4\OneDrive - Bloomberg LP\Desktop\Tesis\TFM_Maestria_Economia_Siqueira_Thiago_Diciembre_2025\datos_y_modelos\db\econometrics_db"
+global base "C:\Users\tsiqueira4\OneDrive - Bloomberg LP\Desktop\Tesis\tmf_thiago_siqueira\datos_y_modelos\db\econometrics_db"
 cd "$base"
 use "panel_main_and_robustness", clear
 
