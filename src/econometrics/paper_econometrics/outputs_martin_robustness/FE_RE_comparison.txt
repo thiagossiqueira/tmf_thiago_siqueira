@@ -1,0 +1,76 @@
+		(1)	(2)
+		FE	FE
+VARIABLES	LABELS	RE	RE
+			
+vix	vix	-0.0262***	-0.0251***
+		(0.0046)	(0.0048)
+fed_3m_forward	fed_3m_forward	0.1297***	0.0665***
+		(0.0243)	(0.0187)
+usd_brl	usd_brl	0.7029***	0.4420***
+		(0.0796)	(0.0497)
+gdp_yoy	gdp_yoy	-0.0745***	-0.0955***
+		(0.0103)	(0.0102)
+debt_gdp	debt_gdp	0.1048***	0.1029***
+		(0.0123)	(0.0127)
+cf_cash_oper_to_tot_asset	cf_cash_oper_to_tot_asset	0.0006	0.0013
+		(0.0012)	(0.0012)
+amount_issued_to_bs_tot_asset	amount_issued_to_bs_tot_asset	-0.1017***	-0.0340***
+		(0.0069)	(0.0044)
+tot_debt_to_ebitda	tot_debt_to_ebitda	0.0007	0.0009
+		(0.0005)	(0.0006)
+days_to_maturity	days_to_maturity	0.2023***	0.0643***
+		(0.0327)	(0.0200)
+synthetic_cds_brl	synthetic_cds_brl	-0.1233***	-0.0967***
+		(0.0125)	(0.0120)
+1o.bond_type_cat	bond_type_cat = 1, omitted	-	-
+			
+2o.sector_cat	sector_cat = 2, omitted	-	
+			
+3o.sector_cat	sector_cat = 3, omitted	-	
+			
+4o.sector_cat	sector_cat = 4, omitted	-	
+			
+5o.sector_cat	sector_cat = 5, omitted	-	
+			
+6o.sector_cat	sector_cat = 6, omitted	-	
+			
+7o.sector_cat	sector_cat = 7, omitted	-	
+			
+8o.sector_cat	sector_cat = 8, omitted	-	
+			
+9o.sector_cat	sector_cat = 9, omitted	-	
+			
+10o.sector_cat	sector_cat = 10, omitted	-	
+			
+11o.sector_cat	sector_cat = 11, omitted	-	
+			
+12o.sector_cat	sector_cat = 12, omitted	-	
+			
+2.sector_cat	sector_cat = 2, Electric		-0.6344*
+			(0.3673)
+3.sector_cat	sector_cat = 3, Energy-Alternate Sources		-0.9650*
+			(0.5150)
+4.sector_cat	sector_cat = 4, Food		0.3400
+			(0.6864)
+5.sector_cat	sector_cat = 5, Forest Products&Paper		-0.4262
+			(1.0170)
+6.sector_cat	sector_cat = 6, Gas		-0.4772
+			(0.7635)
+7.sector_cat	sector_cat = 7, Home Builders		-1.2694*
+			(0.7369)
+8.sector_cat	sector_cat = 8, Iron/Steel		-0.6991
+			(0.4792)
+9.sector_cat	sector_cat = 9, Oil&Gas		-1.7486*
+			(1.0559)
+10.sector_cat	sector_cat = 10, Packaging&Containers		-1.0283
+			(1.0604)
+11.sector_cat	sector_cat = 11, Pharmaceuticals		-2.1022**
+			(0.9879)
+12.sector_cat	sector_cat = 12, Transportation		-1.8358***
+			(0.4089)
+			
+Observations		4,229	4,229
+R-squared		0.1205	
+Number of bond_id		103	103
+Standard errors in parentheses			
+*** p<0.01, ** p<0.05, * p<0.1			

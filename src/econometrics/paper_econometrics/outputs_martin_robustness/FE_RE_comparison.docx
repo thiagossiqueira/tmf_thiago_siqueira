@@ -1,0 +1,85 @@
+{\rtf1\fs24
+\trowd\trgaph75\trleft-75\intbl\trqc\clbrdrt\brdrs\cellx5904\clbrdrt\brdrs\cellx7488\clbrdrt\brdrs\cellx9072
+\ql \cell\qc (1)\cell\qc (2)\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx5904\cellx7488\cellx9072
+\ql \cell\qc FE\cell\qc FE\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx5904\cellx7488\cellx9072
+\trowd\trgaph75\trleft-75\trqc\clbrdrb\brdrs\cellx5904\clbrdrb\brdrs\cellx7488\clbrdrb\brdrs\cellx9072
+\ql VARIABLES\cell\qc RE\cell\qc RE\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx5904\cellx7488\cellx9072
+\ql \cell\qc \cell\qc \cell\row
+\ql vix\cell\qc -0.0262***\cell\qc -0.0251***\cell\row
+\ql \cell\qc (0.0046)\cell\qc (0.0048)\cell\row
+\ql fed_3m_forward\cell\qc 0.1297***\cell\qc 0.0665***\cell\row
+\ql \cell\qc (0.0243)\cell\qc (0.0187)\cell\row
+\ql usd_brl\cell\qc 0.7029***\cell\qc 0.4420***\cell\row
+\ql \cell\qc (0.0796)\cell\qc (0.0497)\cell\row
+\ql gdp_yoy\cell\qc -0.0745***\cell\qc -0.0955***\cell\row
+\ql \cell\qc (0.0103)\cell\qc (0.0102)\cell\row
+\ql debt_gdp\cell\qc 0.1048***\cell\qc 0.1029***\cell\row
+\ql \cell\qc (0.0123)\cell\qc (0.0127)\cell\row
+\ql cf_cash_oper_to_tot_asset\cell\qc 0.0006\cell\qc 0.0013\cell\row
+\ql \cell\qc (0.0012)\cell\qc (0.0012)\cell\row
+\ql amount_issued_to_bs_tot_asset\cell\qc -0.1017***\cell\qc -0.0340***\cell\row
+\ql \cell\qc (0.0069)\cell\qc (0.0044)\cell\row
+\ql tot_debt_to_ebitda\cell\qc 0.0007\cell\qc 0.0009\cell\row
+\ql \cell\qc (0.0005)\cell\qc (0.0006)\cell\row
+\ql days_to_maturity\cell\qc 0.2023***\cell\qc 0.0643***\cell\row
+\ql \cell\qc (0.0327)\cell\qc (0.0200)\cell\row
+\ql synthetic_cds_brl\cell\qc -0.1233***\cell\qc -0.0967***\cell\row
+\ql \cell\qc (0.0125)\cell\qc (0.0120)\cell\row
+\ql bond_type_cat = 1, omitted\cell\qc -\cell\qc -\cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 2, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 3, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 4, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 5, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 6, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 7, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 8, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 9, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 10, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 11, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 12, omitted\cell\qc -\cell\qc \cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql sector_cat = 2, Electric\cell\qc \cell\qc -0.6344*\cell\row
+\ql \cell\qc \cell\qc (0.3673)\cell\row
+\ql sector_cat = 3, Energy-Alternate Sources\cell\qc \cell\qc -0.9650*\cell\row
+\ql \cell\qc \cell\qc (0.5150)\cell\row
+\ql sector_cat = 4, Food\cell\qc \cell\qc 0.3400\cell\row
+\ql \cell\qc \cell\qc (0.6864)\cell\row
+\ql sector_cat = 5, Forest Products&Paper\cell\qc \cell\qc -0.4262\cell\row
+\ql \cell\qc \cell\qc (1.0170)\cell\row
+\ql sector_cat = 6, Gas\cell\qc \cell\qc -0.4772\cell\row
+\ql \cell\qc \cell\qc (0.7635)\cell\row
+\ql sector_cat = 7, Home Builders\cell\qc \cell\qc -1.2694*\cell\row
+\ql \cell\qc \cell\qc (0.7369)\cell\row
+\ql sector_cat = 8, Iron/Steel\cell\qc \cell\qc -0.6991\cell\row
+\ql \cell\qc \cell\qc (0.4792)\cell\row
+\ql sector_cat = 9, Oil&Gas\cell\qc \cell\qc -1.7486*\cell\row
+\ql \cell\qc \cell\qc (1.0559)\cell\row
+\ql sector_cat = 10, Packaging&Containers\cell\qc \cell\qc -1.0283\cell\row
+\ql \cell\qc \cell\qc (1.0604)\cell\row
+\ql sector_cat = 11, Pharmaceuticals\cell\qc \cell\qc -2.1022**\cell\row
+\ql \cell\qc \cell\qc (0.9879)\cell\row
+\ql sector_cat = 12, Transportation\cell\qc \cell\qc -1.8358***\cell\row
+\ql \cell\qc \cell\qc (0.4089)\cell\row
+\ql \cell\qc \cell\qc \cell\row
+\ql Observations\cell\qc 4,229\cell\qc 4,229\cell\row
+\ql R-squared\cell\qc 0.1205\cell\qc \cell\row
+\trowd\trgaph75\trleft-75\trqc\trbrdrb\brdrs\clbrdrb\brdrs\cellx5904\clbrdrb\brdrs\cellx7488\clbrdrb\brdrs\cellx9072
+\ql Number of bond_id\cell\qc 103\cell\qc 103\cell\row
+\pard\qc
+Standard errors in parentheses\par
+*** p<0.01, ** p<0.05, * p<0.1\par
+}

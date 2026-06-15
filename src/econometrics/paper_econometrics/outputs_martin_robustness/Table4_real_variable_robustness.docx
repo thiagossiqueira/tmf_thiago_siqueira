@@ -1,0 +1,41 @@
+{\rtf1\fs24
+\trowd\trgaph75\trleft-75\intbl\trqc\clbrdrt\brdrs\cellx7632\clbrdrt\brdrs\cellx10080\clbrdrt\brdrs\cellx11664\clbrdrt\brdrs\cellx13392\clbrdrt\brdrs\cellx16128
+\ql \cell\qc (1)\cell\qc (2)\cell\qc (3)\cell\qc (4)\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx7632\cellx10080\cellx11664\cellx13392\cellx16128
+\trowd\trgaph75\trleft-75\trqc\clbrdrb\brdrs\cellx7632\clbrdrb\brdrs\cellx10080\clbrdrb\brdrs\cellx11664\clbrdrb\brdrs\cellx13392\clbrdrb\brdrs\cellx16128
+\ql VARIABLES\cell\qc Baseline nominal\cell\qc Real FX\cell\qc Real Fed 3M\cell\qc Real FX + Real Fed\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx7632\cellx10080\cellx11664\cellx13392\cellx16128
+\ql \cell\qc \cell\qc \cell\qc \cell\qc \cell\row
+\ql vix\cell\qc -0.0262***\cell\qc -0.0265***\cell\qc -0.0411***\cell\qc -0.0415***\cell\row
+\ql \cell\qc (0.0052)\cell\qc (0.0055)\cell\qc (0.0053)\cell\qc (0.0054)\cell\row
+\ql fed_3m_forward\cell\qc 0.1297***\cell\qc 0.1063**\cell\qc \cell\qc \cell\row
+\ql \cell\qc (0.0466)\cell\qc (0.0460)\cell\qc \cell\qc \cell\row
+\ql usd_brl\cell\qc 0.7029***\cell\qc \cell\qc 0.8122***\cell\qc \cell\row
+\ql \cell\qc (0.1761)\cell\qc \cell\qc (0.2538)\cell\qc \cell\row
+\ql gdp_yoy\cell\qc -0.0745***\cell\qc -0.0754***\cell\qc -0.1075***\cell\qc -0.1091***\cell\row
+\ql \cell\qc (0.0215)\cell\qc (0.0218)\cell\qc (0.0260)\cell\qc (0.0260)\cell\row
+\ql debt_gdp\cell\qc 0.1048*\cell\qc 0.1022*\cell\qc 0.1650***\cell\qc 0.1538***\cell\row
+\ql \cell\qc (0.0594)\cell\qc (0.0596)\cell\qc (0.0530)\cell\qc (0.0548)\cell\row
+\ql cf_cash_oper_to_tot_asset\cell\qc 0.0006\cell\qc 0.0004\cell\qc -0.0009\cell\qc -0.0011\cell\row
+\ql \cell\qc (0.0051)\cell\qc (0.0050)\cell\qc (0.0060)\cell\qc (0.0059)\cell\row
+\ql amount_issued_to_bs_tot_asset\cell\qc -0.1017**\cell\qc -0.1014**\cell\qc -0.1185**\cell\qc -0.1192**\cell\row
+\ql \cell\qc (0.0438)\cell\qc (0.0441)\cell\qc (0.0462)\cell\qc (0.0463)\cell\row
+\ql tot_debt_to_ebitda\cell\qc 0.0007\cell\qc 0.0008\cell\qc 0.0005\cell\qc 0.0006\cell\row
+\ql \cell\qc (0.0015)\cell\qc (0.0015)\cell\qc (0.0014)\cell\qc (0.0014)\cell\row
+\ql days_to_maturity\cell\qc 0.2023\cell\qc 0.1270\cell\qc 0.1687\cell\qc 0.0964\cell\row
+\ql \cell\qc (0.1588)\cell\qc (0.1529)\cell\qc (0.1838)\cell\qc (0.1651)\cell\row
+\ql synthetic_cds_brl\cell\qc -0.1233**\cell\qc -0.1214**\cell\qc -0.1249**\cell\qc -0.1211*\cell\row
+\ql \cell\qc (0.0559)\cell\qc (0.0552)\cell\qc (0.0615)\cell\qc (0.0603)\cell\row
+\ql Real USD/BRL index; increase = BRL real depreciation\cell\qc \cell\qc 0.0161***\cell\qc \cell\qc 0.0189***\cell\row
+\ql \cell\qc \cell\qc (0.0049)\cell\qc \cell\qc (0.0060)\cell\row
+\ql Fed 3M forward minus US CPI YoY\cell\qc \cell\qc \cell\qc 0.0507\cell\qc 0.0361\cell\row
+\ql \cell\qc \cell\qc \cell\qc (0.0560)\cell\qc (0.0518)\cell\row
+\ql \cell\qc \cell\qc \cell\qc \cell\qc \cell\row
+\ql Observations\cell\qc 4,229\cell\qc 4,229\cell\qc 3,926\cell\qc 3,926\cell\row
+\ql R-squared\cell\qc 0.1205\cell\qc 0.1212\cell\qc 0.1337\cell\qc 0.1351\cell\row
+\trowd\trgaph75\trleft-75\trqc\trbrdrb\brdrs\clbrdrb\brdrs\cellx7632\clbrdrb\brdrs\cellx10080\clbrdrb\brdrs\cellx11664\clbrdrb\brdrs\cellx13392\clbrdrb\brdrs\cellx16128
+\ql Number of bond_id\cell\qc 103\cell\qc 103\cell\qc 103\cell\qc 103\cell\row
+\pard\qc
+Robust standard errors in parentheses\par
+*** p<0.01, ** p<0.05, * p<0.1\par
+}

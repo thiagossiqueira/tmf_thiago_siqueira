@@ -1,0 +1,38 @@
+{\rtf1\fs24
+\trowd\trgaph75\trleft-75\intbl\trqc\clbrdrt\brdrs\cellx4320\clbrdrt\brdrs\cellx6048\clbrdrt\brdrs\cellx7488\clbrdrt\brdrs\cellx9648
+\ql \cell\qc (1)\cell\qc (2)\cell\qc (3)\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx4320\cellx6048\cellx7488\cellx9648
+\trowd\trgaph75\trleft-75\trqc\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx6048\clbrdrb\brdrs\cellx7488\clbrdrb\brdrs\cellx9648
+\ql VARIABLES\cell\qc FE baseline\cell\qc PCSE\cell\qc Driscoll-Kraay\cell\row
+\trowd\trgaph75\trleft-75\trqc\cellx4320\cellx6048\cellx7488\cellx9648
+\ql \cell\qc \cell\qc \cell\qc \cell\row
+\ql vix\cell\qc -0.0262***\cell\qc -0.0248*\cell\qc -0.0262*\cell\row
+\ql \cell\qc (0.0052)\cell\qc (0.0141)\cell\qc (0.0155)\cell\row
+\ql fed_3m_forward\cell\qc 0.1297***\cell\qc 0.1369***\cell\qc 0.1297\cell\row
+\ql \cell\qc (0.0466)\cell\qc (0.0482)\cell\qc (0.0922)\cell\row
+\ql usd_brl\cell\qc 0.7029***\cell\qc 0.5067***\cell\qc 0.7029**\cell\row
+\ql \cell\qc (0.1761)\cell\qc (0.1005)\cell\qc (0.3426)\cell\row
+\ql gdp_yoy\cell\qc -0.0745***\cell\qc -0.0614*\cell\qc -0.0745**\cell\row
+\ql \cell\qc (0.0215)\cell\qc (0.0326)\cell\qc (0.0351)\cell\row
+\ql debt_gdp\cell\qc 0.1048*\cell\qc 0.1077***\cell\qc 0.1048**\cell\row
+\ql \cell\qc (0.0594)\cell\qc (0.0369)\cell\qc (0.0519)\cell\row
+\ql cf_cash_oper_to_tot_asset\cell\qc 0.0006\cell\qc 0.0091***\cell\qc 0.0006\cell\row
+\ql \cell\qc (0.0051)\cell\qc (0.0024)\cell\qc (0.0036)\cell\row
+\ql amount_issued_to_bs_tot_asset\cell\qc -0.1017**\cell\qc 0.0067***\cell\qc -0.1017***\cell\row
+\ql \cell\qc (0.0438)\cell\qc (0.0025)\cell\qc (0.0164)\cell\row
+\ql tot_debt_to_ebitda\cell\qc 0.0007\cell\qc 0.0001\cell\qc 0.0007\cell\row
+\ql \cell\qc (0.0015)\cell\qc (0.0011)\cell\qc (0.0010)\cell\row
+\ql days_to_maturity\cell\qc 0.2023\cell\qc 0.0471***\cell\qc 0.2023\cell\row
+\ql \cell\qc (0.1588)\cell\qc (0.0175)\cell\qc (0.1296)\cell\row
+\ql synthetic_cds_brl\cell\qc -0.1233**\cell\qc -0.0315**\cell\qc -0.1233***\cell\row
+\ql \cell\qc (0.0559)\cell\qc (0.0126)\cell\qc (0.0342)\cell\row
+\ql \cell\qc \cell\qc \cell\qc \cell\row
+\ql Observations\cell\qc 4,229\cell\qc 4,229\cell\qc 4,229\cell\row
+\ql R-squared\cell\qc 0.1205\cell\qc 0.2655\cell\qc \cell\row
+\ql Number of bond_id\cell\qc 103\cell\qc 103\cell\qc \cell\row
+\trowd\trgaph75\trleft-75\trqc\trbrdrb\brdrs\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx6048\clbrdrb\brdrs\cellx7488\clbrdrb\brdrs\cellx9648
+\ql Number of groups\cell\qc \cell\qc \cell\qc 103\cell\row
+\pard\qc
+Robust standard errors in parentheses\par
+*** p<0.01, ** p<0.05, * p<0.1\par
+}
