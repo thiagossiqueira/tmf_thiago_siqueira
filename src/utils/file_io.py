@@ -82,19 +82,79 @@ def load_di_surface(path):
     return surface
 
 def load_ipca_surface(path):
-    df = pd.read_excel(path, sheet_name="only_values")
-    df["Curve date"] = pd.to_datetime(df["Curve date"])
+    """
+    Load the historical WLA / DAP real-rate surface.
 
-    surface = df.rename(columns={
-        "Curve date": "obs_date",
-        "Generic ticker": "generic_ticker_id",
-        "Term": "tenor",
-        "px_last": "yield"
-    })[["obs_date", "generic_ticker_id", "yield", "tenor"]].copy()
+    Bloomberg/B3 DAP quotes are stored in percentage points
+    (e.g. 7.46 = 7.46%). They are converted here to decimal
+    rates (0.0746) because the curve interpolation functions
+    operate on decimal rates.
 
-    surface = surface.dropna(subset=["yield", "tenor"])
-    surface = surface[surface["yield"] > 0]
-    surface["curve_id"] = surface["generic_ticker_id"] + surface["obs_date"].dt.strftime("%Y%m%d")
-    surface = surface.drop_duplicates(subset=["curve_id"], keep="last")
+    Zero and negative real rates are valid observations and
+    must not be removed. Only rows with missing yield or tenor
+    are excluded.
+    """
+
+    df = pd.read_excel(
+        path,
+        sheet_name="only_values"
+    )
+
+    df["Curve date"] = pd.to_datetime(
+        df["Curve date"]
+    )
+
+    surface = df.rename(
+        columns={
+            "Curve date": "obs_date",
+            "Generic ticker": "generic_ticker_id",
+            "Term": "tenor",
+            "px_last": "yield",
+        }
+    )[
+        [
+            "obs_date",
+            "generic_ticker_id",
+            "yield",
+            "tenor",
+        ]
+    ].copy()
+
+    # Ensure numeric fields
+    surface["yield"] = pd.to_numeric(
+        surface["yield"],
+        errors="coerce"
+    )
+
+    surface["tenor"] = pd.to_numeric(
+        surface["tenor"],
+        errors="coerce"
+    )
+
+    # Remove only genuinely unavailable observations
+    surface = surface.dropna(
+        subset=[
+            "yield",
+            "tenor",
+        ]
+    )
+
+    # Bloomberg/B3:
+    # 7.46 means 7.46%
+    #
+    # Curve mathematics:
+    # 0.0746 means 7.46%
+    surface["yield"] = surface["yield"] / 100.0
+
+    # Unique observation identifier
+    surface["curve_id"] = (
+        surface["generic_ticker_id"].astype(str)
+        + surface["obs_date"].dt.strftime("%Y%m%d")
+    )
+
+    surface = surface.drop_duplicates(
+        subset=["curve_id"],
+        keep="last"
+    )
 
     return surface
