@@ -38,9 +38,20 @@ def load_ntnb_metadata(govt_path: str) -> pd.DataFrame:
     df["CALC_TYP_DES"] = df["CALC_TYP_DES"].astype(str).str.upper().str.strip()
     df = df[df["CALC_TYP_DES"] == "BRAZIL I/L BOND"].copy()
 
-    # Parse maturity
-    df["MATURITY"] = pd.to_datetime(df["MATURITY"], errors="coerce")
-    df = df.dropna(subset=["ID", "MATURITY"])
+    # Parse maturity and first coupon date
+    df["MATURITY"] = pd.to_datetime(
+        df["MATURITY"],
+        errors="coerce"
+    )
+
+    df["FIRST_CPN_DT"] = pd.to_datetime(
+        df["FIRST_CPN_DT"],
+        errors="coerce"
+    )
+
+    df = df.dropna(
+        subset=["ID", "MATURITY", "FIRST_CPN_DT"]
+    )
 
     # Ensure coupon fields exist
     for col in ["CPN", "CPN_FREQ", "CPN_TYP"]:
@@ -86,6 +97,104 @@ def load_ntnb_yields(ya_path: str, id_index) -> pd.DataFrame:
     df = df[cols].apply(pd.to_numeric, errors="coerce")
 
     return df
+
+
+
+# =====================================================================
+# 3. Build normalized NTN-B future cash flows
+# =====================================================================
+def build_ntnb_cash_flows(
+    meta_row: pd.Series,
+    obs_date: pd.Timestamp,
+    principal: float = 100.0,
+) -> pd.Series:
+    """
+    Build future normalized cash flows for a standard NTN-B.
+
+    NTN-B convention:
+      - 6% annual real coupon
+      - semiannual coupon payments
+      - semiannual coupon factor:
+            (1 + 0.06) ** 0.5 - 1
+      - principal normalized to 100
+      - only cash flows strictly after obs_date are returned
+
+    The normalization means that historical VNA is not required for
+    constructing the real zero-rate curve.
+    """
+
+    obs_date = pd.Timestamp(obs_date).normalize()
+
+    first_coupon = pd.Timestamp(
+        meta_row["FIRST_CPN_DT"]
+    ).normalize()
+
+    maturity = pd.Timestamp(
+        meta_row["MATURITY"]
+    ).normalize()
+
+    annual_coupon = float(meta_row["CPN"]) / 100.0
+    frequency = int(meta_row["CPN_FREQ"])
+
+    if frequency != 2:
+        raise ValueError(
+            f"Unexpected NTN-B coupon frequency: {frequency}"
+        )
+
+    # Brazilian NTN-B semiannual coupon convention:
+    # not simply 6% / 2.
+    semiannual_coupon_rate = (
+        (1.0 + annual_coupon) ** (1.0 / frequency)
+        - 1.0
+    )
+
+    coupon_amount = (
+        principal * semiannual_coupon_rate
+    )
+
+    # Build complete coupon schedule from first coupon date
+    # through maturity.
+    payment_dates = []
+
+    d = first_coupon
+
+    while d <= maturity:
+        payment_dates.append(d)
+        d = d + pd.DateOffset(
+            months=int(12 / frequency)
+        )
+
+    # Defensive guard: ensure maturity is included exactly once.
+    if maturity not in payment_dates:
+        payment_dates.append(maturity)
+
+    payment_dates = sorted(
+        set(payment_dates)
+    )
+
+    cash_flows = {}
+
+    for payment_date in payment_dates:
+
+        # We only need future cash flows as of obs_date.
+        if payment_date <= obs_date:
+            continue
+
+        amount = coupon_amount
+
+        # Principal is repaid at maturity.
+        if payment_date == maturity:
+            amount += principal
+
+        cash_flows[
+            payment_date.date()
+        ] = float(amount)
+
+    return pd.Series(
+        cash_flows,
+        dtype=float,
+    ).sort_index()
+
 
 
 # =====================================================================
