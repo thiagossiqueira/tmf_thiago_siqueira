@@ -9,6 +9,46 @@ from config import CONFIG
 # Convenção ANBIMA: Business / 252 dias úteis
 DAYCOUNT = DayCounts("bus/252", calendar="cdr_anbima")
 
+def geometric_spread_bps(
+    corporate_yield_pct: float,
+    benchmark_yield_dec: float,
+) -> float:
+    """
+    Geometric corporate spread under annual effective compounding.
+
+    Parameters
+    ----------
+    corporate_yield_pct
+        Corporate YTM in Bloomberg percentage points.
+        Example: 8.53 means 8.53%.
+
+    benchmark_yield_dec
+        Zero-curve benchmark in decimal form.
+        Example: 0.066 means 6.6%.
+
+    Returns
+    -------
+    float
+        Geometric spread in basis points.
+    """
+
+    corporate_yield_dec = (
+        float(corporate_yield_pct) / 100.0
+    )
+
+    benchmark_yield_dec = float(
+        benchmark_yield_dec
+    )
+
+    spread_dec = (
+        (1.0 + corporate_yield_dec)
+        / (1.0 + benchmark_yield_dec)
+        - 1.0
+    )
+
+    return float(
+        spread_dec * 10000.0
+    )
 
 # ============================================================================
 # Função padrão (corporates, NTNF, NTNB)
@@ -22,6 +62,36 @@ DAYCOUNT = DayCounts("bus/252", calendar="cdr_anbima")
 # Se build_real_curve_for_date=None, o comportamento permanece 100% original.
 # ============================================================================
 
+def geometric_spread_bps_from_pct(
+    corporate_yield_pct: float,
+    benchmark_yield_pct: float,
+) -> float:
+    """
+    Geometric spread when both yields are stored in percentage points.
+
+    Example:
+        corporate = 12.5 means 12.5%
+        benchmark = 11.0 means 11.0%
+    """
+
+    corporate_yield_dec = (
+        float(corporate_yield_pct) / 100.0
+    )
+
+    benchmark_yield_dec = (
+        float(benchmark_yield_pct) / 100.0
+    )
+
+    spread_dec = (
+        (1.0 + corporate_yield_dec)
+        / (1.0 + benchmark_yield_dec)
+        - 1.0
+    )
+
+    return float(
+        spread_dec * 10000.0
+    )
+
 def compute_spreads(
     corp_base,
     yields_ts,
@@ -29,9 +99,12 @@ def compute_spreads(
     observation_periods,
     tenors_dict,
     build_real_curve_for_date=None,   # <<< NOVO
-    ntnb_meta_df=None,                # <<< NOVO
-    ntnb_ya_df=None,                  # <<< NOVO
-    wla_yield_func_for_date=None      # <<< NOVO
+    ntnb_meta_df=None,
+    ntnb_ya_df=None,
+    wla_yield_func_for_date=None,
+    wla_max_tenor_func_for_date=None,
+    allow_curve_extrapolation=True,
+    real_curve_cache=None,
 ):
     """
     Calcula spreads entre yields dos bonds e:
@@ -44,6 +117,8 @@ def compute_spreads(
 
     expanded_rows = []
     skipped = []
+    if real_curve_cache is None:
+        real_curve_cache = {}
 
     # --------------------------------------------------------
     # Verificação mínima para curva real soberana combinada
@@ -86,39 +161,104 @@ def compute_spreads(
             #  ela será construída dinamicamente para cada obs_date
             # ===========================================================
             if using_real_curve:
-                real_curve = build_real_curve_for_date(
-                    obs_date,
-                    ntnb_meta_df,
-                    ntnb_ya_df,
-                    wla_yield_func_for_date,
-                )
+                ref_yield = None
 
-                if real_curve is not None:
-                    ref_yield = real_curve.yield_at(tenor_yrs)
-                    spread = ref_yield - yas_yld
+                # -------------------------------------------------------
+                # 1. WLA / DAP has priority whenever the corporate tenor
+                #    is inside the actually observed WLA maturity range
+                #    for that specific observation date.
+                # -------------------------------------------------------
+                max_wla_tenor = np.nan
+
+                if wla_max_tenor_func_for_date is not None:
+                    max_wla_tenor = wla_max_tenor_func_for_date(obs_date)
+
+                if (
+                        wla_yield_func_for_date is not None
+                        and pd.notna(max_wla_tenor)
+                        and tenor_yrs <= float(max_wla_tenor)
+                ):
+                    ref_yield = wla_yield_func_for_date(
+                        obs_date,
+                        tenor_yrs,
+                    )
+
+                # -------------------------------------------------------
+                # 2. Only when the corporate bond lies beyond the
+                #    observed WLA range do we use the sovereign NTN-B
+                #    zero curve estimated through NSS.
+                #
+                #    IMPORTANT:
+                #    use the raw NSS zero curve here, not CombinedRealCurve,
+                #    because we do not want the old fixed-5Y delta shift.
+                # -------------------------------------------------------
+                else:
+                    if obs_date not in real_curve_cache:
+                        real_curve_cache[obs_date] = build_real_curve_for_date(
+                            obs_date,
+                            ntnb_meta_df,
+                            ntnb_ya_df,
+                            wla_yield_func_for_date,
+                            wla_max_tenor_func_for_date,
+                        )
+
+                    real_curve = real_curve_cache[obs_date]
+
+                    if real_curve is not None:
+                        ref_yield = real_curve.yield_at(
+                            tenor_yrs
+                        )
+
+                # -------------------------------------------------------
+                # 3. If a valid benchmark was found, compute the spread.
+                # -------------------------------------------------------
+                if ref_yield is not None and np.isfinite(ref_yield):
+                    spread = geometric_spread_bps(
+                        corporate_yield_pct=yas_yld,
+                        benchmark_yield_dec=ref_yield,
+                    )
 
                     expanded_rows.append({
                         "id": bond_id,
                         "OBS_DATE": obs_date,
                         "MATURITY": bond["MATURITY"],
                         "YAS_BOND_YLD": yas_yld,
-                        "DI_YIELD": ref_yield,   # mantendo nome herdado
+                        "DI_YIELD": ref_yield,
                         "SPREAD": spread,
                         "CPN_TYP": bond.get("CPN_TYP", "Corp bond"),
                         "CPN": bond.get("CPN", np.nan),
-                        "DAYS_TO_MATURITY": (bond["MATURITY"] - obs_date).days,
+                        "DAYS_TO_MATURITY": (
+                                bond["MATURITY"] - obs_date
+                        ).days,
                         "TENOR_YRS": tenor_yrs,
                     })
-                    continue
-                # se real_curve=None => fallback DI
 
+                    continue
+
+                # -------------------------------------------------------
+                # 4. For IPCA, do not silently fall through to another
+                #    benchmark when neither WLA nor the NTN-B curve is
+                #    available.
+                # -------------------------------------------------------
+                if not allow_curve_extrapolation:
+                    skipped.append(
+                        (
+                            bond_id,
+                            obs_date,
+                            "No valid WLA or NTN-B zero benchmark",
+                        )
+                    )
+                    continue
             # ===========================================================
             # COMPORTAMENTO ORIGINAL (DI/IPCA interpolada)
             # ===========================================================
             interpolated_di_yield = interpolate_yield_for_tenor(
                 obs_date, yc_table, tenor_yrs, tenors_dict, obs_date
             )
-            spread = interpolated_di_yield - yas_yld
+            spread = geometric_spread_bps_from_pct(
+                corporate_yield_pct=yas_yld,
+                benchmark_yield_pct=interpolated_di_yield,
+            )
 
             expanded_rows.append({
                 "id": bond_id,

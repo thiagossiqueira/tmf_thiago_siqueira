@@ -99,6 +99,7 @@ class NelsonSiegelSvensson:
         calendar: str = "cdr_anbima",
         ref_date: Date = TODAY,
         lambdas: Optional[np.array] = ANBIMA_LAMBDAS,
+        initial_betas: Optional[np.ndarray] = None,
     ):
         if isinstance(prices, float):
             prices = [prices]
@@ -115,7 +116,9 @@ class NelsonSiegelSvensson:
             dc=self.dc,
             ref_date=self.ref_date,
             lambdas=self.lambdas,
+            initial_betas=initial_betas,
         )
+
 
     # --- static helpers ----------------------------------------------------
 
@@ -133,6 +136,17 @@ class NelsonSiegelSvensson:
         return y
 
     # --- pricing -----------------------------------------------------------
+    def yield_at(self, t: float) -> float:
+        """
+        Return the fitted zero/spot rate for tenor t in years.
+        """
+        return float(
+            self.rate_for_ytm(
+                betas=self.betas,
+                lambdas=self.lambdas,
+                ytm=float(t),
+            )
+        )
 
     def bond_price(
         self,
@@ -185,6 +199,7 @@ class NelsonSiegelSvensson:
         dc: Optional[DayCounts],
         ref_date: Optional[Date],
         lambdas: Optional[np.array],
+        initial_betas: Optional[np.ndarray] = None,
     ):
         obj = lambda x: self.price_errors(
             prices=prices,
@@ -195,7 +210,14 @@ class NelsonSiegelSvensson:
             lambdas=lambdas,
         )
 
-        res = opt.minimize(obj, np.zeros(4), method="SLSQP")
+        x0 = (
+            np.zeros(4)
+            if initial_betas is None
+            else np.asarray(initial_betas, dtype=float)
+        )
+
+        res = opt.minimize(obj, x0, method="SLSQP")
+
         if res.status != 0:
             raise ArithmeticError(f"Optimization failed: {res.message}")
         return res.x

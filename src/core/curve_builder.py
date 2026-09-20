@@ -17,50 +17,86 @@ DAYCOUNT_BUS252 = DayCounts("bus/252", calendar="cdr_anbima")
 # -------------------------------------------------------------------
 # WLA cache (carregado uma única vez para todas as datas)
 # -------------------------------------------------------------------
-_WLA_YC_TABLE: pd.DataFrame | None = None  # index: OBS_DATE, columns: t_years (float)
+# -------------------------------------------------------------------
+# WLA raw-surface cache
+# -------------------------------------------------------------------
+_WLA_SURFACE: pd.DataFrame | None = None
 
 
-def _load_wla_yc_table() -> pd.DataFrame:
+def _load_wla_surface() -> pd.DataFrame:
     """
-    Carrega e interpola a curva WLA IPCA apenas uma vez.
+    Load the historical WLA / DAP real-rate surface once.
 
-    Resultado: DataFrame com:
-      - index: datas (OBS_DATE)
-      - columns: tenores em anos (float), ex: 0.25, 0.5, 1.0, 2.0, ...
+    The surface preserves the actual contract tenors observed on each
+    historical date instead of collapsing them onto a fixed tenor grid.
     """
-    global _WLA_YC_TABLE
-    if _WLA_YC_TABLE is not None:
-        return _WLA_YC_TABLE
+    global _WLA_SURFACE
+
+    if _WLA_SURFACE is not None:
+        return _WLA_SURFACE
 
     from src.utils.file_io import load_ipca_surface
-    from src.utils.interpolation import interpolate_surface
 
-    # Carrega a surface bruta (WLA IPCA)
-    surface = load_ipca_surface(CONFIG["WLA_CURVE_PATH"])
-    tenors = CONFIG["WLA_TENORS"]  # ex: {"3-month": 0.25, "6-month": 0.5, ...}
+    surface = load_ipca_surface(
+        CONFIG["WLA_CURVE_PATH"]
+    ).copy()
 
-    # Interpola usando infra existente (mesma usada antes)
-    yc_table_raw = interpolate_surface(surface, tenors)
-    # yc_table_raw.index -> datas
-    # yc_table_raw.columns -> labels ("3-month", "6-month", ...)
+    surface["obs_date"] = pd.to_datetime(
+        surface["obs_date"]
+    )
 
-    # Mapeia colunas para anos (float)
-    col_map = {}
-    for label, t_years in tenors.items():
-        if label in yc_table_raw.columns:
-            col_map[label] = float(t_years)
+    surface = surface.sort_values(
+        ["obs_date", "tenor"]
+    )
 
-    if not col_map:
-        # Nenhuma coluna bateu; melhor falhar explicitamente
-        raise ValueError("WLA interpolation returned no matching tenor columns.")
+    _WLA_SURFACE = surface
 
-    yc_numeric = yc_table_raw[list(col_map.keys())].copy()
-    yc_numeric = yc_numeric.rename(columns=col_map)  # agora colunas são floats (t_years)
-    yc_numeric = yc_numeric.sort_index()  # ordena por data, por segurança
+    return _WLA_SURFACE
 
-    _WLA_YC_TABLE = yc_numeric
-    return _WLA_YC_TABLE
 
+def wla_max_tenor_for_date(
+    obs_date: pd.Timestamp,
+) -> float:
+    """
+    Return the maximum observed WLA / DAP contract tenor
+    available on the effective curve date.
+
+    This is used to prevent extrapolation beyond the actual
+    maturity range of the WLA market.
+    """
+
+    surface = _load_wla_surface()
+
+    if surface.empty:
+        return float("nan")
+
+    obs_date = pd.Timestamp(
+        obs_date
+    ).normalize()
+
+    available_dates = pd.DatetimeIndex(
+        surface["obs_date"].unique()
+    ).sort_values()
+
+    eligible_dates = available_dates[
+        available_dates <= obs_date
+    ]
+
+    if len(eligible_dates) > 0:
+        obs_date_eff = eligible_dates.max()
+    else:
+        obs_date_eff = available_dates.min()
+
+    grp = surface[
+        surface["obs_date"] == obs_date_eff
+    ]
+
+    if grp.empty:
+        return float("nan")
+
+    return float(
+        grp["tenor"].max()
+    )
 
 # ============================================================
 # 1. Carregar metadados + YA de NTNB, já alinhados
@@ -102,46 +138,66 @@ def load_real_curve_support():
 # ============================================================
 # 2. Wrapper para WLA: yield real curta para uma data
 # ============================================================
-def wla_yield_for_date(obs_date: pd.Timestamp, t_years: float) -> float:
+def wla_yield_for_date(
+    obs_date: pd.Timestamp,
+    t_years: float,
+) -> float:
     """
-    Função helper para obter WLA(t) em uma data, de forma EFICIENTE.
+    Return the WLA / DAP zero rate for an arbitrary tenor.
 
-    Mudanças principais:
-      - Carrega e interpola a surface WLA UMA ÚNICA VEZ (_load_wla_yc_table).
-      - Para cada chamada:
-          1) Escolhe a data de referência mais próxima (<= obs_date; se nenhuma,
-             usa a primeira disponível).
-          2) Escolhe o tenor t_years mais próximo entre as colunas (em anos).
+    Uses the actual WLA contracts available on the effective
+    observation date and ANBIMA flat-forward interpolation.
     """
-    yc_table = _load_wla_yc_table()  # DataFrame index=datetimes, cols=float (t_years)
 
-    if yc_table.empty:
+    from finmath.termstructure.curve_models import (
+        flat_forward_interpolation,
+    )
+
+    surface = _load_wla_surface()
+
+    if surface.empty:
         return float("nan")
 
-    # Garante que obs_date é Timestamp
-    if not isinstance(obs_date, pd.Timestamp):
-        obs_date = pd.to_datetime(obs_date)
+    obs_date = pd.Timestamp(
+        obs_date
+    ).normalize()
 
-    # Escolher a data efetiva:
-    #   - ideal: última data <= obs_date
-    #   - se não houver (obs_date antes do início), usar a primeira disponível
-    dates = yc_table.index
-    mask = dates <= obs_date
-    if mask.any():
-        obs_date_eff = dates[mask].max()
+    available_dates = pd.DatetimeIndex(
+        surface["obs_date"].unique()
+    ).sort_values()
+
+    eligible_dates = available_dates[
+        available_dates <= obs_date
+    ]
+
+    if len(eligible_dates) > 0:
+        obs_date_eff = eligible_dates.max()
     else:
-        obs_date_eff = dates.min()
+        obs_date_eff = available_dates.min()
 
-    row = yc_table.loc[obs_date_eff]
+    grp = surface[
+        surface["obs_date"] == obs_date_eff
+    ].copy()
 
-    # Colunas são tenores em anos (float)
-    tenor_array = np.array(row.index, dtype=float)
-    t = float(t_years)
+    if grp.empty:
+        return float("nan")
 
-    # Encontra tenor mais próximo
-    idx = np.argmin(np.abs(tenor_array - t))
-    return float(row.iloc[idx])
+    curve = (
+        grp
+        .sort_values("tenor")
+        .groupby("tenor")["yield"]
+        .last()
+    )
 
+    if curve.empty:
+        return float("nan")
+
+    return float(
+        flat_forward_interpolation(
+            float(t_years),
+            curve,
+        )
+    )
 
 # ============================================================
 # 3. Builder para uma CombinedRealCurve por data
@@ -163,4 +219,5 @@ def build_real_curve_for_obs_date(
         meta_df=ntnb_meta_df,
         ya_df=ntnb_ya_df,
         wla_yield_func_for_date=wla_yield_for_date,
+        wla_max_tenor_func_for_date=wla_max_tenor_for_date,
     )

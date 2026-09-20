@@ -20,7 +20,9 @@ from src.utils.file_io import (
     load_govt_bond_data,
     load_yield_surface,
     load_di_surface,
+    load_ipca_surface,
 )
+
 from src.utils.interpolation import interpolate_di_surface, interpolate_surface
 from src.utils.plotting import show_benchmark_table
 from src.core.windowing import build_observation_windows
@@ -31,6 +33,9 @@ from src.config import CONFIG
 from src.core.curve_builder import (
     load_real_curve_support,
     build_real_curve_for_obs_date,
+    build_real_curve_for_date,
+    wla_yield_for_date,
+    wla_max_tenor_for_date,
 )
 
 
@@ -185,7 +190,16 @@ if __name__ == "__main__":
 
             else:
                 surface_list = []
-                common_dates = yields_ts.index.intersection(ntnb_ya_df.index)
+
+                wla_dates = pd.DatetimeIndex(
+                    load_ipca_surface(CONFIG["WLA_CURVE_PATH"])["obs_date"].unique()
+                )
+
+                common_dates = (
+                    yields_ts.index
+                    .intersection(ntnb_ya_df.index)
+                    .intersection(wla_dates)
+                )
 
                 real_curve_cache = {}
 
@@ -196,9 +210,48 @@ if __name__ == "__main__":
                         )
 
                     real_curve = real_curve_cache[obs_date]
+
+                    # -------------------------------------------------------
+                    # Fallback for dates where NTN-B NSS is underidentified.
+                    #
+                    # This handles dates where the available NTN-B cross-section
+                    # is insufficient to identify the NSS curve reliably.
+                    #
+                    # WLA is used only within its actually observed maturity
+                    # range. No WLA extrapolation beyond the longest observed
+                    # contract is allowed here.
+                    # -------------------------------------------------------
                     if real_curve is None:
+
+                        max_wla_tenor = wla_max_tenor_for_date(
+                            obs_date
+                        )
+
+                        if pd.isna(max_wla_tenor):
+                            continue
+
+                        for label, t in CONFIG["REAL_CURVE_TENORS"].items():
+
+                            t = float(t)
+
+                            if t > max_wla_tenor:
+                                continue
+
+                            surface_list.append(
+                                {
+                                    "obs_date": obs_date,
+                                    "generic_ticker_id": label,
+                                    "yield": wla_yield_for_date(
+                                        obs_date,
+                                        t,
+                                    ),
+                                    "tenor": t,
+                                }
+                            )
+
                         continue
 
+                    # Normal case: WLA + price-based NTN-B zero curve
                     for label, t in CONFIG["REAL_CURVE_TENORS"].items():
                         surface_list.append(
                             {
@@ -218,9 +271,29 @@ if __name__ == "__main__":
                 yc_table = interpolate_surface(surface, tenors)
 
             # spreads
-            corp_bonds, skipped = compute_spreads(
-                corp_base, yields_ts, yc_table, obs_windows, tenors
-            )
+            if tipo == "ipca":
+                corp_bonds, skipped = compute_spreads(
+                    corp_base,
+                    yields_ts,
+                    yc_table,
+                    obs_windows,
+                    tenors,
+                    build_real_curve_for_date=build_real_curve_for_date,
+                    ntnb_meta_df=ntnb_meta_df,
+                    ntnb_ya_df=ntnb_ya_df,
+                    wla_yield_func_for_date=wla_yield_for_date,
+                    wla_max_tenor_func_for_date=wla_max_tenor_for_date,
+                    allow_curve_extrapolation=False,
+                    real_curve_cache=real_curve_cache,
+                )
+            else:
+                corp_bonds, skipped = compute_spreads(
+                    corp_base,
+                    yields_ts,
+                    yc_table,
+                    obs_windows,
+                    tenors,
+                )
 
             print_fn(f"Spreads {tipo}: {len(corp_bonds)} (ignorados {len(skipped)})")
 
