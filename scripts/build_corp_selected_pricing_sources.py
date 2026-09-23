@@ -73,6 +73,19 @@ EXPECTED_SOURCE_COUNTS = {
     "CMDB": 1,
 }
 
+SOURCE_OVERRIDES = {
+    "AN275276": {
+        "selected_source": "ANDE",
+        "reason": (
+            "Historical waterfall selected BVAL, but BVAL YLD_YTM_MID "
+            "becomes economically invalid after the bond's 2023 principal "
+            "amortization. ANDE provides coherent YTM with complete monthly "
+            "coverage from 2017-08 through 2024-03 and maximum observed "
+            "month-end staleness of 3 days."
+        ),
+    }
+}
+
 
 class ProvenanceError(RuntimeError):
     """Raised when the preserved waterfall files fail an audit check."""
@@ -321,6 +334,50 @@ def build_selected_source_table(
             "original_headers",
         ]
     ].sort_values("bond_id").reset_index(drop=True)
+
+    # ------------------------------------------------------------------
+    # Apply documented source overrides without overwriting the original
+    # waterfall provenance.
+    # ------------------------------------------------------------------
+
+    selected["revised_selected_source"] = selected["selected_source"]
+    selected["revised_security_with_source"] = selected["security_with_source"]
+    selected["source_overridden"] = False
+    selected["override_reason"] = pd.NA
+
+    for base_id, override in SOURCE_OVERRIDES.items():
+
+        mask = selected["base_id"].eq(base_id)
+
+        matches = int(mask.sum())
+
+        if matches != 1:
+            raise ProvenanceError(
+                f"Source override for {base_id} matched {matches} thesis bonds; "
+                "expected exactly 1."
+            )
+
+        revised_source = override["selected_source"]
+
+        selected.loc[
+            mask,
+            "revised_selected_source",
+        ] = revised_source
+
+        selected.loc[
+            mask,
+            "revised_security_with_source",
+        ] = f"{base_id}@{revised_source} Corp"
+
+        selected.loc[
+            mask,
+            "source_overridden",
+        ] = True
+
+        selected.loc[
+            mask,
+            "override_reason",
+        ] = override["reason"]
 
     # ------------------------------------------------------------------
     # 3. Audited counts and strict snapshot checks.
