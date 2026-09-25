@@ -19,6 +19,8 @@ from src.utils.file_io import (
     load_corp_bond_data,
     load_govt_bond_data,
     load_yield_surface,
+    load_corp_ipca_monthly_yields,
+    load_corp_ipca_monthly_metadata,
     load_di_surface,
     load_ipca_surface,
 )
@@ -150,7 +152,9 @@ if __name__ == "__main__":
             "use_real_curve": False,
         },
         "ipca": {
-            "yields_ts": load_yield_surface(CONFIG["YA_PATH"]),
+            "yields_ts": load_corp_ipca_monthly_yields(
+                CONFIG["CORP_IPCA_MONTHLY_YTM_PATH"]
+            ),
             "surface": None,
             "tenors": CONFIG["REAL_CURVE_TENORS"],
             "inflation_linked": "Y",
@@ -297,11 +301,94 @@ if __name__ == "__main__":
 
             print_fn(f"Spreads {tipo}: {len(corp_bonds)} (ignorados {len(skipped)})")
 
-            corp_bonds = anomaly_filtering_results(corp_bonds)
+            if tipo == "ipca":
+                ipca_outlier_audit = (
+                    corp_bonds.loc[
+                        corp_bonds["SPREAD"].abs() > 1000,
+                        [
+                            "id",
+                            "OBS_DATE",
+                            "MATURITY",
+                            "YAS_BOND_YLD",
+                            "DI_YIELD",
+                            "SPREAD",
+                            "CPN_TYP",
+                            "CPN",
+                            "DAYS_TO_MATURITY",
+                            "TENOR_YRS",
+                        ],
+                    ]
+                    .sort_values(["id", "OBS_DATE"])
+                    .reset_index(drop=True)
+                )
+
+                ipca_outlier_audit.to_excel(
+                    "data/corp_bonds_ipca_outlier_audit.xlsx",
+                    index=False,
+                )
+
+            if tipo == "di":
+                corp_bonds = anomaly_filtering_results(corp_bonds)
             df_out = corp_bonds[
                 ["id", "OBS_DATE", "YAS_BOND_YLD", "DI_YIELD", "SPREAD"]
             ].copy()
-            df_out.columns = ["Bond ID", "Obs Date", "Corp Yield (%)", "DI Yield (%)", "Spread (bp)"]
+
+            if tipo == "ipca":
+                df_out["DI_YIELD"] = df_out["DI_YIELD"] * 100
+                df_out.columns = [
+                    "Bond ID",
+                    "Obs Date",
+                    "Corp Yield (%)",
+                    "IPCA Benchmark Yield (%)",
+                    "Spread (bp)",
+                ]
+
+                metadata = load_corp_ipca_monthly_metadata(
+                    CONFIG["CORP_IPCA_MONTHLY_YTM_PATH"]
+                )
+
+                metadata = metadata.rename(
+                    columns={
+                        "bond_id": "Bond ID",
+                        "obs_date": "Obs Date",
+                        "quote_date": "Quote Date",
+                        "revised_selected_source": "Selected Source",
+                        "selected_source": "Original Selected Source",
+                        "source_overridden": "Source Overridden",
+                        "override_reason": "Override Reason",
+                        "staleness_days": "Staleness Days",
+                        "exact_date_match": "Exact Date Match",
+                    }
+                )
+
+                df_out = df_out.merge(
+                    metadata[
+                        [
+                            "Bond ID",
+                            "Obs Date",
+                            "Quote Date",
+                            "Staleness Days",
+                            "Exact Date Match",
+                            "Selected Source",
+                            "Original Selected Source",
+                            "Source Overridden",
+                            "Override Reason",
+                        ]
+                    ],
+                    on=["Bond ID", "Obs Date"],
+                    how="left",
+                    validate="one_to_one",
+                )
+
+            else:
+                df_out.columns = [
+                    "Bond ID",
+                    "Obs Date",
+                    "Corp Yield (%)",
+                    "DI Yield (%)",
+                    "Spread (bp)",
+                ]
+
             df_out = remove_unnamed(df_out)
             df_out.to_excel(f"data/corp_bonds_{tipo}_summary.xlsx", index=False)
 

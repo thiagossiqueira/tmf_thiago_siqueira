@@ -12,6 +12,138 @@ def load_yield_surface(path):
     df.columns = df.columns.astype(str).str.strip()
     return df
 
+def load_corp_ipca_monthly_yields(path):
+    """
+    Load the audited monthly corporate IPCA YTM panel and reshape it
+    to the wide format expected by compute_spreads().
+
+    Output:
+        index   = obs_date
+        columns = bond_id
+        values  = corporate_yield_pct
+    """
+
+    df = pd.read_excel(
+        path,
+        sheet_name="monthly_asof",
+    )
+
+    required = {
+        "bond_id",
+        "obs_date",
+        "corporate_yield_pct",
+    }
+
+    missing = required.difference(df.columns)
+    if missing:
+        raise ValueError(
+            f"Corporate IPCA monthly YTM file is missing columns: "
+            f"{sorted(missing)}"
+        )
+
+    df["bond_id"] = (
+        df["bond_id"]
+        .astype(str)
+        .str.strip()
+    )
+
+    df["obs_date"] = pd.to_datetime(
+        df["obs_date"],
+        errors="coerce",
+    )
+
+    df["corporate_yield_pct"] = pd.to_numeric(
+        df["corporate_yield_pct"],
+        errors="coerce",
+    )
+
+    if df["obs_date"].isna().any():
+        raise ValueError(
+            "Corporate IPCA monthly YTM contains unparseable obs_date values."
+        )
+
+    if df["corporate_yield_pct"].isna().any():
+        raise ValueError(
+            "Corporate IPCA monthly YTM contains missing/non-numeric yields."
+        )
+
+    duplicates = df.duplicated(
+        subset=["bond_id", "obs_date"]
+    ).sum()
+
+    if duplicates:
+        raise ValueError(
+            f"Corporate IPCA monthly YTM contains "
+            f"{duplicates} duplicate bond/date rows."
+        )
+
+    wide = (
+        df.pivot(
+            index="obs_date",
+            columns="bond_id",
+            values="corporate_yield_pct",
+        )
+        .sort_index()
+    )
+
+    wide.columns.name = None
+
+    return wide
+
+
+def load_corp_ipca_monthly_metadata(path):
+    """
+    Load provenance and quote-timing metadata for the audited
+    monthly corporate IPCA YTM panel.
+
+    Returns one row per bond_id / obs_date.
+    """
+
+    df = pd.read_excel(
+        path,
+        sheet_name="monthly_asof",
+        usecols=[
+            "bond_id",
+            "obs_date",
+            "quote_date",
+            "revised_selected_source",
+            "selected_source",
+            "source_overridden",
+            "override_reason",
+            "staleness_days",
+            "exact_date_match",
+        ],
+    )
+
+    df["bond_id"] = (
+        df["bond_id"]
+        .astype(str)
+        .str.strip()
+    )
+
+    df["obs_date"] = pd.to_datetime(
+        df["obs_date"],
+        errors="coerce",
+    )
+
+    df["quote_date"] = pd.to_datetime(
+        df["quote_date"],
+        errors="coerce",
+    )
+
+    duplicates = df.duplicated(
+        subset=["bond_id", "obs_date"]
+    ).sum()
+
+    if duplicates:
+        raise ValueError(
+            f"Corporate IPCA metadata contains "
+            f"{duplicates} duplicate bond/date rows."
+        )
+
+    return df
+
+
 def load_corp_bond_data(path):
     df = pd.read_excel(path, sheet_name="db_values_only")
     df["id"] = df["id"].astype(str).str.strip()
