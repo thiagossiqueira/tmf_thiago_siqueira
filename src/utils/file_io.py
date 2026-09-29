@@ -191,25 +191,137 @@ def load_govt_bond_data(path):
     return df
 
 def load_di_surface(path):
-    curve_df = pd.read_excel(path, sheet_name="only_values")
-    curve_df["Curve date"] = pd.to_datetime(curve_df["Curve date"])
+    """
+    Load the nominal BRL local reference curve.
 
-    surface = curve_df.rename(columns={
-        "Curve date": "obs_date",
-        "Generic ticker": "generic_ticker_id",
-        "Term": "tenor",
-        "px_last": "yield"
-    })[["obs_date", "generic_ticker_id", "yield", "tenor"]].copy()
+    Source hierarchy by observation date:
+      1. Cash DI-over: 1-business-day anchor.
+      2. DI futures: liquid contracts only (volume > 1000),
+         strictly beyond the cash tenor.
+      3. Pre x DI swaps: only maturities strictly beyond the
+         longest valid DI future on that same date.
 
-    if "volume" in curve_df.columns:
-        surface["volume"] = pd.to_numeric(curve_df["volume"], errors="coerce")
-        surface = surface.dropna(subset=["volume"])
-        surface = surface[surface["volume"] > 1000]
+    This prevents overlapping cash/futures/swaps from entering
+    the interpolation simultaneously and makes the futures-to-swap
+    splice date-specific.
+    """
 
-    surface = surface.dropna(subset=["yield", "tenor"])
-    surface = surface[surface["yield"] > 0]
-    surface["curve_id"] = surface["generic_ticker_id"] + surface["obs_date"].dt.strftime("%Y%m%d")
-    surface = surface.drop_duplicates(subset=["curve_id"], keep="last")
+    curve_df = pd.read_excel(
+        path,
+        sheet_name="only_values",
+    ).copy()
+
+    curve_df["Curve date"] = pd.to_datetime(
+        curve_df["Curve date"],
+        errors="coerce",
+    )
+
+    curve_df["Term"] = pd.to_numeric(
+        curve_df["Term"],
+        errors="coerce",
+    )
+
+    curve_df["px_last"] = pd.to_numeric(
+        curve_df["px_last"],
+        errors="coerce",
+    )
+
+    curve_df["volume"] = pd.to_numeric(
+        curve_df["volume"],
+        errors="coerce",
+    )
+
+    curve_df["Type"] = (
+        curve_df["Type"]
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+    # --------------------------------------------------------
+    # Basic validity
+    # --------------------------------------------------------
+    curve_df = curve_df[
+        curve_df["Curve date"].notna()
+        & curve_df["Term"].notna()
+        & curve_df["px_last"].notna()
+        & (curve_df["px_last"] > 0)
+    ].copy()
+
+    cash_term = 1.0 / 252.0
+    selected_parts = []
+
+    # --------------------------------------------------------
+    # Date-specific source selection
+    # --------------------------------------------------------
+    for obs_date, grp in curve_df.groupby("Curve date"):
+
+        # 1. Cash anchor
+        cash = grp[
+            grp["Type"].eq("cash")
+        ].copy()
+
+        # 2. Liquid DI futures beyond cash
+        futures = grp[
+            grp["Type"].eq("future")
+            & grp["volume"].notna()
+            & (grp["volume"] > 1000)
+            & (grp["Term"] > cash_term)
+        ].copy()
+
+        max_future_tenor = (
+            futures["Term"].max()
+            if not futures.empty
+            else cash_term
+        )
+
+        # 3. Swaps only beyond the longest liquid future
+        swaps = grp[
+            grp["Type"].eq("swap")
+            & (grp["Term"] > max_future_tenor)
+        ].copy()
+
+        selected_parts.extend(
+            [cash, futures, swaps]
+        )
+
+    selected = pd.concat(
+        selected_parts,
+        ignore_index=True,
+    )
+
+    if selected.empty:
+        raise ValueError(
+            "No valid DI curve observations after source selection."
+        )
+    # --------------------------------------------------------
+    # Standard output format
+    # --------------------------------------------------------
+    surface = selected.rename(
+        columns={
+            "Curve date": "obs_date",
+            "Generic ticker": "generic_ticker_id",
+            "px_last": "yield",
+            "Term": "tenor",
+        }
+    )[
+        [
+            "obs_date",
+            "generic_ticker_id",
+            "yield",
+            "tenor",
+        ]
+    ].copy()
+
+    surface["curve_id"] = (
+        surface["generic_ticker_id"].astype(str)
+        + surface["obs_date"].dt.strftime("%Y%m%d")
+    )
+
+    surface = surface.drop_duplicates(
+        subset=["curve_id"],
+        keep="last",
+    )
 
     return surface
 

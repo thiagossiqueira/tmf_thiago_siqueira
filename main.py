@@ -297,6 +297,7 @@ if __name__ == "__main__":
                     yc_table,
                     obs_windows,
                     tenors,
+                    di_surface=surface,
                 )
 
             print_fn(f"Spreads {tipo}: {len(corp_bonds)} (ignorados {len(skipped)})")
@@ -448,7 +449,15 @@ if __name__ == "__main__":
             print_fn(f"Bonds após filtro ({tipo}): {len(govt_base)}")
 
             if tipo == "ltn":
-                yc_table = interpolate_di_surface(load_di_surface(CONFIG["HIST_CURVE_PATH"]), tenors)
+
+                di_surface = load_di_surface(
+                    CONFIG["HIST_CURVE_PATH"]
+                )
+
+                yc_table = interpolate_di_surface(
+                    di_surface,
+                    tenors,
+                )
 
                 if govt_base.empty:
                     continue
@@ -470,8 +479,14 @@ if __name__ == "__main__":
                     continue
 
                 df_exp = pd.concat(govt_list, ignore_index=True)
-                govt_bonds = compute_spreads_ltn(df_exp, yc_table)
-                govt_bonds = anomaly_filtering_results(govt_bonds, is_ltn=True)
+
+                govt_bonds = compute_spreads_ltn(
+                    df_ltn=df_exp,
+                    yc_table=yc_table,
+                    di_surface=di_surface,
+                )
+
+                govt_bonds = anomaly_filtering_results(govt_bonds)
 
                 df_out = govt_bonds[["id", "OBS_DATE", "YAS_BOND_YLD", "DI_YIELD", "SPREAD"]]
                 df_out.columns = ["Bond ID", "Obs Date", "Govt Yield (%)", "DI Yield (%)", "Spread (bp)"]
@@ -524,11 +539,26 @@ if __name__ == "__main__":
                 continue
 
             # GOVERNMENT DI
-            yc_table = interpolate_di_surface(load_di_surface(CONFIG["HIST_CURVE_PATH"]), tenors)
-            govt_bonds, skipped = compute_spreads(
-                govt_base, yields_ts, yc_table,
-                build_observation_windows(govt_base, yields_ts, CONFIG["OBS_WINDOW"]),
+            di_surface = load_di_surface(
+                CONFIG["HIST_CURVE_PATH"]
+            )
+
+            yc_table = interpolate_di_surface(
+                di_surface,
                 tenors,
+            )
+
+            govt_bonds, skipped = compute_spreads(
+                govt_base,
+                yields_ts,
+                yc_table,
+                build_observation_windows(
+                    govt_base,
+                    yields_ts,
+                    CONFIG["OBS_WINDOW"],
+                ),
+                tenors,
+                di_surface=di_surface,
             )
 
             govt_bonds = anomaly_filtering_results(govt_bonds)

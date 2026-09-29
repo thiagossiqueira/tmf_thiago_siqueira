@@ -2,7 +2,10 @@
 
 import numpy as np
 import pandas as pd
-from utils.interpolation import interpolate_yield_for_tenor
+from utils.interpolation import (
+    interpolate_yield_for_tenor,
+    interpolate_raw_di_yield_for_tenor,
+)
 from calendars.daycounts import DayCounts
 from config import CONFIG
 
@@ -105,6 +108,7 @@ def compute_spreads(
     wla_max_tenor_func_for_date=None,
     allow_curve_extrapolation=True,
     real_curve_cache=None,
+    di_surface=None,
 ):
     """
     Calcula spreads entre yields dos bonds e:
@@ -252,9 +256,33 @@ def compute_spreads(
             # ===========================================================
             # COMPORTAMENTO ORIGINAL (DI/IPCA interpolada)
             # ===========================================================
-            interpolated_di_yield = interpolate_yield_for_tenor(
-                obs_date, yc_table, tenor_yrs, tenors_dict, obs_date
-            )
+            if di_surface is not None:
+                interpolated_di_yield = interpolate_raw_di_yield_for_tenor(
+                    surface=di_surface,
+                    obs_date=obs_date,
+                    target_tenor=tenor_yrs,
+                )
+            else:
+                # Backward-compatible fallback for callers that still provide
+                # only the standard-tenor yc_table.
+                interpolated_di_yield = interpolate_yield_for_tenor(
+                    obs_date,
+                    yc_table,
+                    tenor_yrs,
+                    tenors_dict,
+                    obs_date,
+                )
+
+            if pd.isna(interpolated_di_yield):
+                skipped.append(
+                    (
+                        bond_id,
+                        obs_date,
+                        "No valid same-date DI benchmark",
+                    )
+                )
+                continue
+
             spread = geometric_spread_bps_from_pct(
                 corporate_yield_pct=yas_yld,
                 benchmark_yield_pct=interpolated_di_yield,
@@ -291,61 +319,154 @@ def compute_spreads(
 # Função para LTNs (zero)
 # Mantida sem alterações (DI continua sendo baseline)
 # ============================================================================
-def compute_spreads_ltn(df_ltn: pd.DataFrame, yc_table: pd.DataFrame) -> pd.DataFrame:
+def compute_spreads_ltn(
+    df_ltn: pd.DataFrame,
+    yc_table: pd.DataFrame = None,
+    di_surface: pd.DataFrame = None,
+) -> pd.DataFrame:
     """
-    Cálculo de spreads para LTNs usando curva DI.
+    Calculate LTN sovereign spreads against the nominal DI curve.
+
+    Preferred path:
+        interpolate directly from the selected raw DI market nodes
+        on the same observation date and at the bond's exact
+        residual tenor.
+
+    yc_table is retained only as a backward-compatible fallback.
     """
+
     df = df_ltn.copy()
 
-    df["MATURITY"] = pd.to_datetime(df["MATURITY"], errors="coerce")
-    df["OBS_DATE"] = pd.to_datetime(df["OBS_DATE"], errors="coerce")
-
-    df["TENOR_YRS"] = df.apply(
-        lambda r: DAYCOUNT.tf(r["OBS_DATE"], r["MATURITY"])
-        if pd.notna(r["OBS_DATE"]) and pd.notna(r["MATURITY"])
-        else np.nan,
-        axis=1
+    df["MATURITY"] = pd.to_datetime(
+        df["MATURITY"],
+        errors="coerce",
     )
-    df = df[df["TENOR_YRS"] > 0]
 
-    if yc_table is None or yc_table.empty:
-        raise ValueError("yc_table vazia: DI indisponível para LTNs")
+    df["OBS_DATE"] = pd.to_datetime(
+        df["OBS_DATE"],
+        errors="coerce",
+    )
 
-    if yc_table.shape[0] > 1:
-        yc_interp = yc_table.T.mean(axis=1)
-    else:
-        yc_interp = yc_table.T.iloc[:, 0]
+    df["YAS_BOND_YLD"] = pd.to_numeric(
+        df["YAS_BOND_YLD"],
+        errors="coerce",
+    )
+
+    # --------------------------------------------------------
+    # Residual maturity under the thesis BUS/252 convention
+    # --------------------------------------------------------
+    df["TENOR_YRS"] = df.apply(
+        lambda r: DAYCOUNT.tf(
+            r["OBS_DATE"],
+            r["MATURITY"],
+        )
+        if (
+            pd.notna(r["OBS_DATE"])
+            and pd.notna(r["MATURITY"])
+        )
+        else np.nan,
+        axis=1,
+    )
+
+    df = df[
+        df["TENOR_YRS"].notna()
+        & (df["TENOR_YRS"] > 0)
+    ].copy()
+
+    if di_surface is None and (
+        yc_table is None or yc_table.empty
+    ):
+        raise ValueError(
+            "No DI benchmark available for LTNs."
+        )
 
     tenor_map = CONFIG.get("TENORS", {})
 
-    if yc_interp.index.dtype == object:
-        yc_interp.index = yc_interp.index.map(tenor_map).astype(float)
-    else:
-        yc_interp.index = pd.to_numeric(yc_interp.index, errors="coerce")
+    # --------------------------------------------------------
+    # Same-date DI benchmark
+    # --------------------------------------------------------
+    def get_di_yield(row):
 
-    yc_interp = yc_interp[~pd.isna(yc_interp.index)]
+        if di_surface is not None:
+            return interpolate_raw_di_yield_for_tenor(
+                surface=di_surface,
+                obs_date=row["OBS_DATE"],
+                target_tenor=row["TENOR_YRS"],
+            )
 
-    df["DI_YIELD"] = df["TENOR_YRS"].apply(
-        lambda t: yc_interp.iloc[(abs(yc_interp.index - t)).argmin()]
+        # Backward-compatible fallback:
+        # same observation date, but using the standard-tenor table.
+        if row["OBS_DATE"] not in yc_table.index:
+            return np.nan
+
+        return interpolate_yield_for_tenor(
+            obs_date=row["OBS_DATE"],
+            yc_table=yc_table,
+            target_tenor=row["TENOR_YRS"],
+            tenors=tenor_map,
+            curve_id=row["OBS_DATE"],
+        )
+
+    df["DI_YIELD"] = df.apply(
+        get_di_yield,
+        axis=1,
     )
 
-    df["YAS_BOND_YLD"] = pd.to_numeric(df["YAS_BOND_YLD"], errors="coerce")
-    df["DI_YIELD"] = pd.to_numeric(df["DI_YIELD"], errors="coerce")
-    df["SPREAD"] = df["DI_YIELD"] - df["YAS_BOND_YLD"]
+    df["DI_YIELD"] = pd.to_numeric(
+        df["DI_YIELD"],
+        errors="coerce",
+    )
 
-    names = [str(round(i, 2)) for i in yc_interp.index]
-    vals = np.array(list(yc_interp.index))
+    # No benchmark -> no sovereign spread
+    df = df[
+        df["YAS_BOND_YLD"].notna()
+        & df["DI_YIELD"].notna()
+    ].copy()
+
+    # --------------------------------------------------------
+    # Geometric sovereign spread, in basis points
+    #
+    # (1 + Y_gov) / (1 + Y_DI) - 1
+    # --------------------------------------------------------
+    df["SPREAD"] = df.apply(
+        lambda r: geometric_spread_bps_from_pct(
+            corporate_yield_pct=r["YAS_BOND_YLD"],
+            benchmark_yield_pct=r["DI_YIELD"],
+        ),
+        axis=1,
+    )
+
+    # --------------------------------------------------------
+    # Descriptive tenor bucket only
+    # --------------------------------------------------------
+    names = list(tenor_map.keys())
+    vals = np.array(
+        list(tenor_map.values()),
+        dtype=float,
+    )
+
     df["TENOR_BUCKET"] = df["TENOR_YRS"].apply(
-        lambda y: names[np.argmin(np.abs(vals - y))]
+        lambda y: names[
+            np.argmin(
+                np.abs(vals - y)
+            )
+        ]
     )
 
     df["CPN_TYP"] = "ZERO"
     df["CPN"] = np.nan
+
     df["DAYS_TO_MATURITY"] = df.apply(
-        lambda r: DAYCOUNT.days(r["OBS_DATE"], r["MATURITY"])
-        if pd.notna(r["OBS_DATE"]) and pd.notna(r["MATURITY"])
+        lambda r: DAYCOUNT.days(
+            r["OBS_DATE"],
+            r["MATURITY"],
+        )
+        if (
+            pd.notna(r["OBS_DATE"])
+            and pd.notna(r["MATURITY"])
+        )
         else np.nan,
-        axis=1
+        axis=1,
     )
 
     return df
