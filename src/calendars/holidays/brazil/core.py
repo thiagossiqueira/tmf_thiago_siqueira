@@ -1034,6 +1034,15 @@ class BRCalendars(object):
                   date(2078, 11, 2),
                   date(2078, 11, 15),
                   date(2078, 12, 25)]
+
+        # National holiday from 2024 onward (Lei 14.759/2023).
+        last_calendar_year = max(d.year for d in h_list)
+        h_list.extend(
+            date(year, 11, 20)
+            for year in range(2024, last_calendar_year + 1)
+        )
+        h_list = sorted(set(h_list))
+
         return h_list
 
     @staticmethod
