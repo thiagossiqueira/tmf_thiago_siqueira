@@ -368,3 +368,61 @@ di as result "Model 4 rho: " %9.6f `m4_rho'
 * No final Word/RTF export yet.
 *-------------------------------------------------------------------------------
 
+
+*===============================================================================
+* MG-30 DIAGNOSTIC - WITH VS WITHOUT ISSUE-SIZE CONTROL
+*
+* Purpose:
+* Re-estimate the original four models WITH AMT_ISSUED / BS_TOT_ASSET on the
+* exact same common sample used by the MG-30 exclusion models.
+*
+* This isolates the effect of removing the issue-size control.
+* Amount outstanding / total assets and turnover remain explicitly deferred.
+*===============================================================================
+
+local model1_with_size `model1_x' amount_issued_to_bs_tot_asset
+local model2_with_size `model2_x' amount_issued_to_bs_tot_asset
+local model3_with_size `model3_x' amount_issued_to_bs_tot_asset
+local model4_with_size `model4_x' amount_issued_to_bs_tot_asset
+
+di as text "=================================================="
+di as text "MG-30 WITH-VS-WITHOUT ISSUE-SIZE COMPARISON"
+di as text "Same sample; bond FE; Driscoll-Kraay lag(4)"
+di as text "=================================================="
+
+xtscc spread `model1_with_size' if sample_common, fe lag(4)
+estimates store M1_WITH_SIZE
+
+xtscc spread `model2_with_size' if sample_common, fe lag(4)
+estimates store M2_WITH_SIZE
+
+xtscc spread `model3_with_size' if sample_common, fe lag(4)
+estimates store M3_WITH_SIZE
+
+xtscc spread `model4_with_size' if sample_common, fe lag(4)
+estimates store M4_WITH_SIZE
+
+estimates table ///
+    M1_WITH_SIZE M1_DK ///
+    M2_WITH_SIZE M2_DK ///
+    M3_WITH_SIZE M3_DK ///
+    M4_WITH_SIZE M4_DK, ///
+    b(%9.4f) se(%9.4f) stats(N r2_w)
+
+
+*-------------------------------------------------------------------------------
+* Martin table Model 5:
+* exact Model 1 specification excluding AMT_ISSUED / BS_TOT_ASSET only.
+*-------------------------------------------------------------------------------
+
+estimates restore M1_DK
+estimates store M5_NO_ISSUE_SIZE
+
+estimates table ///
+    M1_WITH_SIZE ///
+    M2_WITH_SIZE ///
+    M3_WITH_SIZE ///
+    M4_WITH_SIZE ///
+    M5_NO_ISSUE_SIZE, ///
+    b(%9.4f) se(%9.4f) stats(N r2_w)
+
