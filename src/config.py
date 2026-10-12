@@ -9,7 +9,7 @@ while not (REPO_ROOT / ".git").exists() and REPO_ROOT != REPO_ROOT.parent:
 # Caminhos centralizados para os arquivos de dados
 CONFIG = {
     "CORP_PATH": REPO_ROOT / "datos_y_modelos" / "Domestic" / "universo_brazil_deb_des.xlsx",
-    "GOVT_PATH": REPO_ROOT / "datos_y_modelos" / "Domestic" / "domestic_sovereign_curve_brazil.xlsx",
+    "GOVT_PATH": REPO_ROOT / "datos_y_modelos" / "Domestic" / "domestic_sovereign_curve_brazil.v2.xlsx",
     "YA_PATH": REPO_ROOT / "datos_y_modelos" / "db" / "brazil_domestic_corp_bonds" / "ya.v1.xlsx",
     "CORP_IPCA_MONTHLY_YTM_PATH": (
         REPO_ROOT
@@ -26,7 +26,7 @@ CONFIG = {
     "PANEL_DATA_OUTPUT_PATH": REPO_ROOT / "datos_y_modelos" / "db" / "output_panel_data" / "panel_data_with_cds.xlsx",
 
     "SOVEREIGN_REAL_CURVE": {
-    "path": REPO_ROOT / "datos_y_modelos" / "Domestic" / "domestic_sovereign_curve_brazil.xlsx",
+    "path": REPO_ROOT / "datos_y_modelos" / "Domestic" / "domestic_sovereign_curve_brazil.v2.xlsx",
     "sheet_name": "db_values_only",
     "use_nss": True,
     },

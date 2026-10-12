@@ -104,7 +104,7 @@ WLA_CURVE = (
 
 GOVT_METADATA = (
     DOMESTIC_DIR
-    / "domestic_sovereign_curve_brazil.xlsx"
+    / "domestic_sovereign_curve_brazil.v2.xlsx"
 )
 
 
@@ -2434,7 +2434,8 @@ def build_sovereign_spread(
         .reset_index(drop=True)
     )
 
-    # WP-02 frozen package reconciliation.
+    # Reconciliation after extending the validated ANDE/YAS
+    # sovereign history back through 2010-2015.
     type_counts = (
         sovereign_points
         .groupby("TYPE")
@@ -2443,8 +2444,8 @@ def build_sovereign_spread(
     )
 
     expected_counts = {
-        "LTN": 252,
-        "NTNF": 330,
+        "LTN": 894,
+        "NTNF": 730,
     }
 
     if type_counts != expected_counts:
@@ -2453,9 +2454,9 @@ def build_sovereign_spread(
             f"Expected {expected_counts}, got {type_counts}."
         )
 
-    if len(sovereign_points) != 582:
+    if len(sovereign_points) != 1624:
         raise AssertionError(
-            "Expected 582 sovereign LTN/NTN-F observations, "
+            "Expected 1624 sovereign LTN/NTN-F observations, "
             f"got {len(sovereign_points)}."
         )
 
@@ -2957,15 +2958,15 @@ def assemble_rebuilt_panel(
         .sum()
     )
 
-    if sovereign_nonmissing != 3918:
+    if sovereign_nonmissing != 4648:
         raise AssertionError(
-            "Expected 3,918 non-missing sovereign spreads; "
+            "Expected 4,648 non-missing sovereign spreads; "
             f"got {sovereign_nonmissing:,}."
         )
 
-    if sovereign_missing != 730:
+    if sovereign_missing != 0:
         raise AssertionError(
-            "Expected 730 missing sovereign spreads; "
+            "Expected 0 missing sovereign spreads; "
             f"got {sovereign_missing:,}."
         )
 
@@ -2977,9 +2978,9 @@ def assemble_rebuilt_panel(
     if panel.loc[
         pre_2016,
         "sovereign_spread_brl",
-    ].notna().any():
+    ].isna().any():
         raise AssertionError(
-            "Pre-2016 sovereign values were unexpectedly populated."
+            "Missing sovereign spread in pre-2016 sample."
         )
 
     post_2016 = ~pre_2016
