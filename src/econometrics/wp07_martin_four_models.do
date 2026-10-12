@@ -1,7 +1,7 @@
 *===============================================================================
 * WP-07 - Martin four-model specification
-* DATA PREPARATION + SPECIFICATION ONLY
-* No regressions are run and the frozen WP-06 panel is never overwritten.
+* FOUR-MODEL FE-DK ROBUSTNESS ESTIMATION
+* The frozen WP-06 panel is read only and never overwritten.
 *===============================================================================
 
 clear all
@@ -365,7 +365,94 @@ di as result "Model 2 rho: " %9.6f `m2_rho'
 di as result "Model 3 rho: " %9.6f `m3_rho'
 di as result "Model 4 rho: " %9.6f `m4_rho'
 
+*===============================================================================
+* FINAL FOUR-MODEL FE-DK TABLE
+*===============================================================================
+
+capture which esttab
+if _rc {
+    ssc install estout, replace
+}
+
+* Add rho from the companion FE regressions to the stored DK estimates.
+estadd scalar rho = `m1_rho' : M1_DK
+estadd scalar rho = `m2_rho' : M2_DK
+estadd scalar rho = `m3_rho' : M3_DK
+estadd scalar rho = `m4_rho' : M4_DK
+
+local table_keep ///
+    vix ///
+    fed_3m_forward ///
+    usd_brl ///
+    real_exchange_rate ///
+    gdp_yoy ///
+    debt_gdp ///
+    sovereign_spread_brl ///
+    cf_cash_oper_to_tot_asset ///
+    amount_issued_to_bs_tot_asset ///
+    tot_debt_to_ebitda ///
+    days_to_maturity
+
+esttab M1_DK M2_DK M3_DK M4_DK using ///
+    "`root'\src\econometrics\wp07_reestimation\Table5_WP07_Martin_Four_Models_DK.txt", ///
+    replace ///
+    keep(`table_keep') ///
+    varlabels(vix "VIX" ///
+              fed_3m_forward "Fed 3M forward" ///
+              usd_brl "USD/BRL (nominal)" ///
+              real_exchange_rate "Real USD/BRL index" ///
+              gdp_yoy "GDP growth (YoY)" ///
+              debt_gdp "Gross government debt (% GDP)" ///
+              sovereign_spread_brl "Sovereign spread BRL" ///
+              cf_cash_oper_to_tot_asset "Operating cash flow / total assets" ///
+              amount_issued_to_bs_tot_asset "Issue amount / total assets" ///
+              tot_debt_to_ebitda "Total debt / EBITDA" ///
+              days_to_maturity "Residual maturity (years, BUS/252)") ///
+    mtitles("M1: NER baseline" "M2: RER" "M3: Sovereign" "M4: Local macro/RER") ///
+    b(4) se(4) ///
+    stats(N r2_w N_g rho, ///
+          fmt(0 4 0 4) ///
+          labels("Observations" "Within R-squared" "Number of bonds" "rho")) ///
+    star(* 0.10 ** 0.05 *** 0.01) ///
+    nocons nonotes ///
+    addnotes("Bond fixed effects in all specifications." ///
+             "Driscoll-Kraay standard errors with maximum lag 4." ///
+             "All columns use the same 4,648-observation estimation sample." ///
+             "M2 replaces nominal USD/BRL with the bilateral real exchange-rate index." ///
+             "M3 focuses on sovereign risk and excludes local GDP, public debt and FX controls." ///
+             "M4 uses RER and local macro controls but excludes sovereign spread." ///
+             "* p<0.10, ** p<0.05, *** p<0.01")
+
+esttab M1_DK M2_DK M3_DK M4_DK using ///
+    "`root'\src\econometrics\wp07_reestimation\Table5_WP07_Martin_Four_Models_DK.rtf", ///
+    replace rtf ///
+    keep(`table_keep') ///
+    varlabels(vix "VIX" ///
+              fed_3m_forward "Fed 3M forward" ///
+              usd_brl "USD/BRL (nominal)" ///
+              real_exchange_rate "Real USD/BRL index" ///
+              gdp_yoy "GDP growth (YoY)" ///
+              debt_gdp "Gross government debt (% GDP)" ///
+              sovereign_spread_brl "Sovereign spread BRL" ///
+              cf_cash_oper_to_tot_asset "Operating cash flow / total assets" ///
+              amount_issued_to_bs_tot_asset "Issue amount / total assets" ///
+              tot_debt_to_ebitda "Total debt / EBITDA" ///
+              days_to_maturity "Residual maturity (years, BUS/252)") ///
+    mtitles("M1: NER baseline" "M2: RER" "M3: Sovereign" "M4: Local macro/RER") ///
+    b(4) se(4) ///
+    stats(N r2_w N_g rho, ///
+          fmt(0 4 0 4) ///
+          labels("Observations" "Within R-squared" "Number of bonds" "rho")) ///
+    star(* 0.10 ** 0.05 *** 0.01) ///
+    nocons nonotes ///
+    addnotes("Bond fixed effects in all specifications." ///
+             "Driscoll-Kraay standard errors with maximum lag 4." ///
+             "All columns use the same 4,648-observation estimation sample." ///
+             "M2 replaces nominal USD/BRL with the bilateral real exchange-rate index." ///
+             "M3 focuses on sovereign risk and excludes local GDP, public debt and FX controls." ///
+             "M4 uses RER and local macro controls but excludes sovereign spread." ///
+             "* p<0.10, ** p<0.05, *** p<0.01")
+
 *-------------------------------------------------------------------------------
-* STOP HERE.
-* No final Word/RTF export yet.
+* End of four-model WP-07 robustness estimation and export.
 *-------------------------------------------------------------------------------
