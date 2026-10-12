@@ -402,6 +402,25 @@ estimates store M3_WITH_SIZE
 xtscc spread `model4_with_size' if sample_common, fe lag(4)
 estimates store M4_WITH_SIZE
 
+* Companion FE regressions only to recover rho for WITH-SIZE models.
+xtreg spread `model1_with_size' if sample_common, fe
+local m1ws_rho = e(rho)
+
+xtreg spread `model2_with_size' if sample_common, fe
+local m2ws_rho = e(rho)
+
+xtreg spread `model3_with_size' if sample_common, fe
+local m3ws_rho = e(rho)
+
+xtreg spread `model4_with_size' if sample_common, fe
+local m4ws_rho = e(rho)
+
+di as text "RHO - WITH ISSUE SIZE MODELS"
+di as result "M1_WITH_SIZE rho: " %9.6f `m1ws_rho'
+di as result "M2_WITH_SIZE rho: " %9.6f `m2ws_rho'
+di as result "M3_WITH_SIZE rho: " %9.6f `m3ws_rho'
+di as result "M4_WITH_SIZE rho: " %9.6f `m4ws_rho'
+
 estimates table ///
     M1_WITH_SIZE M1_DK ///
     M2_WITH_SIZE M2_DK ///
@@ -425,4 +444,97 @@ estimates table ///
     M4_WITH_SIZE ///
     M5_NO_ISSUE_SIZE, ///
     b(%9.4f) se(%9.4f) stats(N r2_w)
+
+*===============================================================================
+* FINAL FIVE-MODEL FE-DK TABLE
+*===============================================================================
+
+capture which esttab
+if _rc {
+    ssc install estout, replace
+}
+
+* Add rho from companion conventional FE regressions.
+estadd scalar rho = `m1ws_rho' : M1_WITH_SIZE
+estadd scalar rho = `m2ws_rho' : M2_WITH_SIZE
+estadd scalar rho = `m3ws_rho' : M3_WITH_SIZE
+estadd scalar rho = `m4ws_rho' : M4_WITH_SIZE
+estadd scalar rho = `m1_rho'   : M5_NO_ISSUE_SIZE
+
+local table_keep ///
+    vix ///
+    fed_3m_forward ///
+    usd_brl ///
+    real_exchange_rate ///
+    gdp_yoy ///
+    debt_gdp ///
+    sovereign_spread_brl ///
+    cf_cash_oper_to_tot_asset ///
+    amount_issued_to_bs_tot_asset ///
+    tot_debt_to_ebitda ///
+    days_to_maturity
+
+esttab M1_WITH_SIZE M2_WITH_SIZE M3_WITH_SIZE M4_WITH_SIZE M5_NO_ISSUE_SIZE using ///
+    "`root'\src\econometrics\wp07_reestimation\Table5_WP08_Martin_Five_Models_DK.txt", ///
+    replace ///
+    keep(`table_keep') ///
+    order(`table_keep') ///
+    varlabels(vix "VIX" ///
+              fed_3m_forward "Fed 3M forward" ///
+              usd_brl "USD/BRL (nominal)" ///
+              real_exchange_rate "Real USD/BRL index" ///
+              gdp_yoy "GDP growth (YoY)" ///
+              debt_gdp "Gross government debt (% GDP)" ///
+              sovereign_spread_brl "Sovereign spread BRL" ///
+              cf_cash_oper_to_tot_asset "Operating cash flow / total assets" ///
+              amount_issued_to_bs_tot_asset "Issue amount / total assets" ///
+              tot_debt_to_ebitda "Total debt / EBITDA" ///
+              days_to_maturity "Residual maturity (years, BUS/252)") ///
+    mtitles("M1: NER baseline" "M2: RER" "M3: Sovereign" "M4: Local macro/RER" "M5: No issue size") ///
+    b(4) se(4) ///
+    stats(N r2_w N_g rho, ///
+          fmt(0 4 0 4) ///
+          labels("Observations" "Within R-squared" "Number of bonds" "rho")) ///
+    star(* 0.10 ** 0.05 *** 0.01) ///
+    nocons nonotes ///
+    addnotes("Bond fixed effects in all specifications." ///
+             "Driscoll-Kraay standard errors with maximum lag 4." ///
+             "All columns use the same 4,648-observation estimation sample." ///
+             "M2 replaces nominal USD/BRL with the bilateral real exchange-rate index." ///
+             "M3 focuses on sovereign risk and excludes local GDP, public debt and FX controls." ///
+             "M4 uses RER and local macro controls but excludes sovereign spread." ///
+             "M5 repeats M1 excluding Issue amount / total assets only." ///
+             "* p<0.10, ** p<0.05, *** p<0.01")
+
+esttab M1_WITH_SIZE M2_WITH_SIZE M3_WITH_SIZE M4_WITH_SIZE M5_NO_ISSUE_SIZE using ///
+    "`root'\src\econometrics\wp07_reestimation\Table5_WP08_Martin_Five_Models_DK.rtf", ///
+    replace rtf ///
+    keep(`table_keep') ///
+    order(`table_keep') ///
+    varlabels(vix "VIX" ///
+              fed_3m_forward "Fed 3M forward" ///
+              usd_brl "USD/BRL (nominal)" ///
+              real_exchange_rate "Real USD/BRL index" ///
+              gdp_yoy "GDP growth (YoY)" ///
+              debt_gdp "Gross government debt (% GDP)" ///
+              sovereign_spread_brl "Sovereign spread BRL" ///
+              cf_cash_oper_to_tot_asset "Operating cash flow / total assets" ///
+              amount_issued_to_bs_tot_asset "Issue amount / total assets" ///
+              tot_debt_to_ebitda "Total debt / EBITDA" ///
+              days_to_maturity "Residual maturity (years, BUS/252)") ///
+    mtitles("M1: NER baseline" "M2: RER" "M3: Sovereign" "M4: Local macro/RER" "M5: No issue size") ///
+    b(4) se(4) ///
+    stats(N r2_w N_g rho, ///
+          fmt(0 4 0 4) ///
+          labels("Observations" "Within R-squared" "Number of bonds" "rho")) ///
+    star(* 0.10 ** 0.05 *** 0.01) ///
+    nocons nonotes ///
+    addnotes("Bond fixed effects in all specifications." ///
+             "Driscoll-Kraay standard errors with maximum lag 4." ///
+             "All columns use the same 4,648-observation estimation sample." ///
+             "M2 replaces nominal USD/BRL with the bilateral real exchange-rate index." ///
+             "M3 focuses on sovereign risk and excludes local GDP, public debt and FX controls." ///
+             "M4 uses RER and local macro controls but excludes sovereign spread." ///
+             "M5 repeats M1 excluding Issue amount / total assets only." ///
+             "* p<0.10, ** p<0.05, *** p<0.01")
 
