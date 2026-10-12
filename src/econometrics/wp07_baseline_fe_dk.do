@@ -67,7 +67,7 @@ estimates store FE
 capture noisily ssc install xtscc, replace
 egen t_dk = group(month_id)
 xtset bond_id t_dk
-xtscc spread `base_x', fe
+xtscc spread `base_x', fe lag(4)
 estimates store DK
 
 log close
@@ -81,10 +81,46 @@ if _rc {
     ssc install estout, replace
 }
 
+esttab FE DK using "Table5_WP07_FE_DK.txt", replace ///
+    keep(vix fed_3m_forward usd_brl gdp_yoy debt_gdp ///
+         cf_cash_oper_to_tot_asset amount_issued_to_bs_tot_asset ///
+         tot_debt_to_ebitda days_to_maturity sovereign_spread_brl) ///
+    varlabels(vix "VIX" ///
+              fed_3m_forward "Fed 3M forward" ///
+              usd_brl "USD/BRL" ///
+              gdp_yoy "GDP growth (YoY)" ///
+              debt_gdp "Gross government debt (% GDP)" ///
+              cf_cash_oper_to_tot_asset "Operating cash flow / total assets" ///
+              amount_issued_to_bs_tot_asset "Issue amount / total assets" ///
+              tot_debt_to_ebitda "Total debt / EBITDA" ///
+              days_to_maturity "Residual maturity (years, BUS/252)" ///
+              sovereign_spread_brl "Sovereign spread BRL") ///
+    mtitles("FE" "Driscoll-Kraay") ///
+    b(4) se(4) ///
+    stats(N r2_w N_g, ///
+          fmt(0 4 0) ///
+          labels("Observations" "Within R-squared" "Number of bonds")) ///
+    star(* 0.10 ** 0.05 *** 0.01) ///
+    nocons nonotes ///
+    addnotes("Bond fixed effects included in both specifications." ///
+             "Column (1): standard errors clustered by issuer." ///
+             "Column (2): Driscoll-Kraay standard errors, maximum lag 4." ///
+             "* p<0.10, ** p<0.05, *** p<0.01")
+
 esttab FE DK using "Table5_WP07_FE_DK.rtf", replace rtf ///
     keep(vix fed_3m_forward usd_brl gdp_yoy debt_gdp ///
          cf_cash_oper_to_tot_asset amount_issued_to_bs_tot_asset ///
          tot_debt_to_ebitda days_to_maturity sovereign_spread_brl) ///
+    varlabels(vix "VIX" ///
+              fed_3m_forward "Fed 3M forward" ///
+              usd_brl "USD/BRL" ///
+              gdp_yoy "GDP growth (YoY)" ///
+              debt_gdp "Gross government debt (% GDP)" ///
+              cf_cash_oper_to_tot_asset "Operating cash flow / total assets" ///
+              amount_issued_to_bs_tot_asset "Issue amount / total assets" ///
+              tot_debt_to_ebitda "Total debt / EBITDA" ///
+              days_to_maturity "Residual maturity (years, BUS/252)" ///
+              sovereign_spread_brl "Sovereign spread BRL") ///
     mtitles("FE" "Driscoll-Kraay") ///
     b(4) se(4) ///
     stats(N r2_w N_g, ///

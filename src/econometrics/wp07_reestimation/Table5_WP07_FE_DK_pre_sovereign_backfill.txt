@@ -1,0 +1,34 @@
+		(1)	(2)
+VARIABLES	LABELS	FE	Driscoll-Kraay
+			
+vix	vix	0.7727	0.7727
+		(0.9453)	(1.0947)
+fed_3m_forward	fed_3m_forward	-2.2100	-2.2100
+		(7.9631)	(12.8244)
+usd_brl	usd_brl	4.1179	4.1179
+		(13.7480)	(30.3367)
+gdp_yoy	gdp_yoy	3.1008*	3.1008
+		(1.7228)	(2.3996)
+debt_gdp	debt_gdp	-2.4678	-2.4678
+		(2.1434)	(3.4588)
+cf_cash_oper_to_tot_asset	cf_cash_oper_to_tot_asset	-0.2070	-0.2070
+		(0.1983)	(0.3089)
+amount_issued_to_bs_tot_asset	amount_issued_to_bs_tot_asset	12.0537*	12.0537***
+		(6.0922)	(1.7370)
+tot_debt_to_ebitda	tot_debt_to_ebitda	-0.0430	-0.0430
+		(0.0610)	(0.0538)
+days_to_maturity	days_to_maturity	-23.1362	-23.1362
+		(17.0048)	(18.4232)
+sovereign_spread_brl	sovereign_spread_brl	-0.6790	-0.6790
+		(0.6291)	(0.6444)
+			
+Observations		3918	3918
+Number of bond_id		101	
+Bond fixed effects		Yes	Yes
+SE specification		Clustered by issuer	Driscoll-Kraay
+Within R-squared		0.121	0.121
+Number of bonds		101	101
+Number of groups			101
+lag 4			
+Robust standard errors in parentheses			
+*** p<0.01, ** p<0.05, * p<0.1			
