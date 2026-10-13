@@ -306,7 +306,7 @@ That route was not selected as the immediate implementation because:
 2. ticker rollover and reference-month conventions require additional validation;
 3. point-in-time handling of CPI fixing quotes is more complex;
 4. the Philadelphia Fed SPF is official, transparent, reproducible, and widely recognized;
-5. SPF data allow coverage of the thesis's core 2016m1–2025m6 estimation window.
+5. SPF CPI3 and official release-date data support the full frozen-panel window, 2010m12-2025m6. The earlier 2016m1 cutoff was an implementation restriction rather than a source-data limitation.
 
 The Bloomberg fixing approach remains a possible additional market-based robustness exercise, but it is not required for the current director-requested check.
 
@@ -340,11 +340,11 @@ As of 11 October 2026:
 [DONE] Source provenance documented
 [DONE] Expected-inflation variable selected: CPI3
 [DONE] Point-in-time rule selected: latest official release as of month-end
-[TODO] Build deterministic quarterly-to-monthly transformation
-[TODO] Validate 2016m1–2025m6 coverage and timing
-[TODO] Construct real_fed_3m_spf
-[TODO] Run FE-DK robustness regression(s)
-[TODO] Decide final thesis/table presentation
+[DONE] Deterministic quarterly-to-monthly transformation built using the latest official SPF release available at each month-end
+[DONE] Full 2010m12-2025m6 coverage and point-in-time timing validated: 175 months, zero missing SPF observations, zero look-ahead violations
+[DONE] real_fed_3m_spf constructed for 2010m12-2025m6 using USSOC minus SPF CPI3
+[TODO] Re-estimate final FE-DK models after backward Real Fed extension
+[TODO] Refresh final diagnostics, tables, WP-10 reporting and thesis text after re-estimation
 ```
 
 ---

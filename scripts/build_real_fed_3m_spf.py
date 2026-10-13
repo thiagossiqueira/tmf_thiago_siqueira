@@ -21,7 +21,7 @@ RELEASE_FILE = INPUT_DIR / "spf-release-dates.txt"
 
 OUTPUT_FILE = INPUT_DIR / "spf_cpi_next_quarter_monthly.csv"
 
-START_MONTH = "2016-01-31"
+START_MONTH = "2010-12-31"
 END_MONTH = "2025-06-30"
 
 

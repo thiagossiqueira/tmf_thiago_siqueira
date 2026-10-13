@@ -117,8 +117,8 @@ def main() -> None:
         ]
     ].sort_values("month_end")
 
-    if len(out) != 114:
-        raise ValueError(f"Expected 114 rows, got {len(out)}.")
+    if len(out) != 175:
+        raise ValueError(f"Expected 175 rows, got {len(out)}.")
 
     checks = {
         "2016-01-31": -1.3594,
