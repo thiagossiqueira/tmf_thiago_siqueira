@@ -1,5 +1,10 @@
 *===============================================================================
+* LEGACY / HISTORICAL - NOT FOR FINAL RESULTS
 * Real Fed 3M SPF robustness
+*
+* This file preserves the original WP-08 robustness exercise committed in
+* 9c1fd41. It uses the historical WP-08 specification and sample lock and
+* must not be used to reproduce the final seven-model FE-DK results.
 *
 * Director request: test whether the U.S. 3M nominal-rate control can be
 * expressed in real terms by netting expected inflation.
