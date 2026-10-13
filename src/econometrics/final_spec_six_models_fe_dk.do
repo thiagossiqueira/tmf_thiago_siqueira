@@ -1,0 +1,501 @@
+*===============================================================================
+* FINAL SPECIFICATION - SIX-MODEL FE DRISCOLL-KRAAY TABLE
+*
+* Final common sample:
+*   3,918 observations
+*   101 bonds
+*   48 issuers
+*   2016m1 - 2025m6
+*
+* Estimator:
+*   Bond fixed effects
+*   Driscoll-Kraay standard errors
+*   Maximum lag = 4
+*
+* All six models use the same locked common sample.
+*===============================================================================
+clear all
+set more off
+
+local root "C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira"
+
+capture log close
+log using ///
+    "`root'\src\econometrics\wp07_reestimation\Final_spec_six_models_fe_dk.log", ///
+    replace text
+
+*===============================================================================
+* 1. LOAD FROZEN WP-06 PANEL
+*===============================================================================
+
+import excel using ///
+    "`root'\datos_y_modelos\db\econometrics_db\panel_main_and_robustness_rebuilt.xlsx", ///
+    sheet("ts") firstrow clear
+
+gen double month_id = mofd(dofc(month))
+format month_id %tm
+
+count if missing(month_id)
+if r(N)>0 {
+    di as error "month_id could not be constructed for all frozen-panel rows."
+    exit 198
+}
+
+tempfile frozen_panel
+save `frozen_panel'
+
+*===============================================================================
+* 2. LOAD CPI LEVEL INPUTS FOR BILATERAL RER
+*===============================================================================
+
+import delimited using ///
+    "`root'\datos_y_modelos\db\real_exchange_rate_inputs\rer_cpi_monthly_inputs.csv", ///
+    varnames(1) clear
+
+gen double cpi_date = date(month, "YMD")
+gen double month_id = mofd(cpi_date)
+format month_id %tm
+
+isid month_id
+
+keep month_id cpi_us_index cpi_br_index us_series_id br_series_id
+
+tempfile rer_inputs
+save `rer_inputs'
+
+*===============================================================================
+* 3. LOAD VALIDATED REAL FED 3M INPUT
+*===============================================================================
+
+import delimited using ///
+    "`root'\datos_y_modelos\db\brazil_macroeconomic_data\real_fed_3m\real_fed_3m_spf_monthly.csv", ///
+    varnames(1) clear
+
+gen double real_fed_date = date(month_end, "YMD")
+gen double month_id = mofd(real_fed_date)
+format month_id %tm
+
+isid month_id
+
+keep month_id ///
+    ussoc_px_last ///
+    spf_cpi_next_quarter ///
+    real_fed_3m_spf ///
+    real_fed_3m_spf_exact
+
+tempfile real_fed_inputs
+save `real_fed_inputs'
+
+*===============================================================================
+* 4. LOAD VALIDATED REAL BRAZIL 3M INPUT
+*===============================================================================
+
+import delimited using ///
+    "`root'\datos_y_modelos\db\brazil_macroeconomic_data\real_brazil_3m\real_brazil_3m_focus_panel_dates.csv", ///
+    varnames(1) clear
+
+gen double real_brazil_date = date(obs_date, "YMD")
+gen double month_id = mofd(real_brazil_date)
+format month_id %tm
+
+isid month_id
+
+count if missing(real_brazil_3m_focus)
+if r(N)>0 {
+    di as error "Missing primary Real Brazil 3M values."
+    exit 459
+}
+
+count if abs(nominal_di_canonical_diff_bp) > 1e-9 ///
+    & !missing(nominal_di_canonical_diff_bp)
+if r(N)>0 {
+    di as error "Real Brazil input fails canonical DI reconciliation."
+    exit 459
+}
+
+keep month_id ///
+    nominal_brazil_3m_di_pct ///
+    expected_ipca_ann_pct ///
+    real_brazil_3m_focus ///
+    real_brazil_3m_focus_exact ///
+    nominal_di_canonical_diff_bp
+
+tempfile real_brazil_inputs
+save `real_brazil_inputs'
+
+*===============================================================================
+* 5. RESTORE FROZEN PANEL AND MERGE RER INPUTS
+*===============================================================================
+
+use `frozen_panel', clear
+
+merge m:1 month_id using `rer_inputs'
+
+count if _merge != 3
+if r(N)>0 {
+    di as error "CPI/RER merge did not match all frozen-panel observations."
+    tab _merge
+    exit 459
+}
+drop _merge
+
+count if missing(cpi_us_index, cpi_br_index)
+if r(N)>0 {
+    di as error "Missing CPI inputs after RER merge."
+    exit 459
+}
+
+* Bilateral real USD/BRL:
+* RER_t = USD/BRL_t * CPI_US_t / CPI_BR_t
+* Increase = BRL real depreciation.
+
+gen double rer_usd_brl = ///
+    usd_brl * cpi_us_index / cpi_br_index
+
+quietly summarize rer_usd_brl if month_id == tm(2010m12), meanonly
+local base_rer = r(mean)
+
+if missing(`base_rer') {
+    di as error "December 2010 RER base value is missing."
+    exit 459
+}
+
+gen double real_exchange_rate = ///
+    100 * rer_usd_brl / `base_rer'
+
+label variable real_exchange_rate ///
+    "Real USD/BRL index; increase = BRL real depreciation"
+
+*===============================================================================
+* 6. MERGE REAL FED 3M
+*===============================================================================
+
+merge m:1 month_id using `real_fed_inputs'
+
+count if _merge == 2
+if r(N)>0 {
+    di as error "Real-Fed input contains months not present in frozen panel."
+    tab _merge
+    exit 459
+}
+
+* Pre-2016 master-only observations are expected because the validated
+* Real-Fed SPF series begins in 2016m1.
+
+gen double fed_nominal_diff = ///
+    abs(fed_3m_forward - ussoc_px_last) if _merge == 3
+
+quietly summarize fed_nominal_diff, meanonly
+di as result ///
+    "MAX |frozen-panel Fed - Real-Fed nominal input|: " %12.10f r(max)
+
+count if fed_nominal_diff > 1e-6 & !missing(fed_nominal_diff)
+if r(N)>0 {
+    di as error ///
+        "Real-Fed nominal leg does not reproduce frozen-panel fed_3m_forward."
+    exit 459
+}
+
+drop _merge fed_nominal_diff
+
+label variable real_fed_3m_spf ///
+    "Real US 3M OIS: USSOC minus SPF expected next-quarter CPI"
+
+*===============================================================================
+* 7. MERGE REAL BRAZIL 3M
+*===============================================================================
+
+merge m:1 month_id using `real_brazil_inputs'
+
+count if _merge != 3
+if r(N)>0 {
+    di as error ///
+        "Real Brazil 3M input did not match all frozen-panel months."
+    tab _merge
+    exit 459
+}
+drop _merge
+
+quietly summarize nominal_di_canonical_diff_bp, meanonly
+di as result ///
+    "MAX |Brazil nominal DI - canonical DI| (bp): " %12.10f r(max)
+
+label variable real_brazil_3m_focus ///
+    "Real Brazil 3M DI: nominal DI minus Focus expected IPCA"
+
+*===============================================================================
+* 8. MARTIN GRANDES FINAL SIX-COLUMN X-MATRIX
+*
+* M1  Global factors
+* M2  Global + local macro
+* M3  Global + local macro + sovereign risk
+* M4  Global + sovereign risk
+* M5  Full: global + local + sovereign + firm/bond
+* M6  Global + local monetary 3M rate
+*
+* Source-accurate implementation:
+*   Real Fed      -> real_fed_3m_spf
+*   USD/BRL RER   -> real_exchange_rate
+*   Brazil 3M     -> real_brazil_3m_focus
+*
+* No nominal USD/BRL.
+* No nominal Fed 3M.
+* No amount_issued_to_bs_tot_asset.
+*===============================================================================
+
+local model1_x ///
+    vix ///
+    real_fed_3m_spf
+
+local model2_x ///
+    vix ///
+    real_fed_3m_spf ///
+    real_exchange_rate ///
+    real_brazil_3m_focus ///
+    gdp_yoy ///
+    debt_gdp
+
+local model3_x ///
+    vix ///
+    real_fed_3m_spf ///
+    real_exchange_rate ///
+    real_brazil_3m_focus ///
+    gdp_yoy ///
+    debt_gdp ///
+    sovereign_spread_brl
+
+local model4_x ///
+    vix ///
+    real_fed_3m_spf ///
+    sovereign_spread_brl
+
+local model5_x ///
+    vix ///
+    real_fed_3m_spf ///
+    real_exchange_rate ///
+    real_brazil_3m_focus ///
+    gdp_yoy ///
+    debt_gdp ///
+    sovereign_spread_brl ///
+    cf_cash_oper_to_tot_asset ///
+    tot_debt_to_ebitda ///
+    days_to_maturity
+
+local model6_x ///
+    vix ///
+    real_fed_3m_spf ///
+    real_brazil_3m_focus
+
+*===============================================================================
+* 9. NATURAL COMPLETE-CASE SAMPLE BY MODEL
+*===============================================================================
+
+forvalues m = 1/6 {
+    gen byte sample_m`m' = 1
+    markout sample_m`m' spread `model`m'_x'
+
+    di as text "============================================================"
+    di as text "MODEL `m' NATURAL COMPLETE-CASE SAMPLE"
+
+    count if sample_m`m'
+    local nobs = r(N)
+    di as result "Observations: `nobs'"
+
+    quietly summarize month_id if sample_m`m', meanonly
+    di as result "First month: " %tm r(min)
+    di as result "Last month:  " %tm r(max)
+
+    levelsof bond_id if sample_m`m', local(bonds)
+    local nbonds : word count `bonds'
+    di as result "Number of bonds: `nbonds'"
+
+    levelsof issuer if sample_m`m', local(issuers)
+    local nissuers : word count `issuers'
+    di as result "Number of issuers: `nissuers'"
+}
+
+*===============================================================================
+* 10. COMMON FINAL TABLE SAMPLE
+*
+* M5 contains the union of all variables appearing anywhere in M1-M6.
+* Therefore its complete-case sample is the strict common sample required
+* to hold observations fixed across all six final columns.
+*===============================================================================
+
+gen byte sample_common = sample_m5
+
+di as text "============================================================"
+di as text "STRICT COMMON FINAL-TABLE SAMPLE"
+
+count if sample_common
+local ncommon = r(N)
+di as result "COMMON SAMPLE OBSERVATIONS: `ncommon'"
+
+quietly summarize month_id if sample_common, meanonly
+di as result "Common sample first month: " %tm r(min)
+di as result "Common sample last month:  " %tm r(max)
+
+levelsof bond_id if sample_common, local(common_bonds)
+local ncommon_bonds : word count `common_bonds'
+di as result "Common sample bonds: `ncommon_bonds'"
+
+levelsof issuer if sample_common, local(common_issuers)
+local ncommon_issuers : word count `common_issuers'
+di as result "Common sample issuers: `ncommon_issuers'"
+
+* Verify common sample is admissible in every model.
+forvalues m = 1/6 {
+    count if sample_common & !sample_m`m'
+    if r(N)>0 {
+        di as error ///
+            "ERROR: common M5 sample is not nested inside Model `m' sample."
+        exit 459
+    }
+}
+
+*===============================================================================
+* 11. VERIFY LOCKED FINAL SAMPLE
+*===============================================================================
+
+count if sample_common
+if r(N) != 3918 {
+    di as error "Expected 3,918 final-sample observations."
+    exit 459
+}
+
+levelsof bond_id if sample_common, local(final_bonds)
+local n_final_bonds : word count `final_bonds'
+if `n_final_bonds' != 101 {
+    di as error "Expected 101 bonds in final sample."
+    exit 459
+}
+
+*===============================================================================
+* 12. PANEL SETUP FOR DRISCOLL-KRAAY
+*===============================================================================
+
+encode bond_id, gen(bond_id_num)
+egen t_dk = group(month_id)
+xtset bond_id_num t_dk
+
+capture which xtscc
+if _rc {
+    di as error "xtscc is not installed."
+    exit 499
+}
+
+capture which esttab
+if _rc {
+    di as error "esttab/estout is not installed."
+    exit 499
+}
+
+*===============================================================================
+* 13. ESTIMATE FINAL SIX MODELS
+*===============================================================================
+
+forvalues m = 1/6 {
+
+    di as text "============================================================"
+    di as text "FINAL FE-DK MODEL `m'"
+    di as text "============================================================"
+
+    xtscc spread `model`m'_x' if sample_common, fe lag(4)
+    estimates store M`m'_DK
+
+    local m`m'_N   = e(N)
+    local m`m'_Ng  = e(N_g)
+    local m`m'_r2w = e(r2_w)
+
+    if `m`m'_N' != 3918 {
+        di as error "Model `m' does not use 3,918 observations."
+        exit 459
+    }
+
+    if `m`m'_Ng' != 101 {
+        di as error "Model `m' does not use 101 bonds."
+        exit 459
+    }
+
+    * Companion FE regression only to recover rho.
+    xtreg spread `model`m'_x' if sample_common, fe
+    local m`m'_rho = e(rho)
+
+    estadd scalar rho = `m`m'_rho' : M`m'_DK
+}
+
+*===============================================================================
+* 14. SIDE-BY-SIDE VALIDATION
+*===============================================================================
+
+estimates table M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK, ///
+    b(%9.4f) se(%9.4f) stats(N r2_w)
+
+*===============================================================================
+* 15. FINAL TABLE EXPORT
+*===============================================================================
+
+local table_keep ///
+    vix ///
+    real_fed_3m_spf ///
+    real_exchange_rate ///
+    real_brazil_3m_focus ///
+    gdp_yoy ///
+    debt_gdp ///
+    sovereign_spread_brl ///
+    cf_cash_oper_to_tot_asset ///
+    tot_debt_to_ebitda ///
+    days_to_maturity
+
+local table_options ///
+    keep(`table_keep') ///
+    varlabels(vix "VIX" ///
+              real_fed_3m_spf "Real Fed 3M forward" ///
+              real_exchange_rate "Real USD/BRL index" ///
+              real_brazil_3m_focus "Real Brazil 3M rate" ///
+              gdp_yoy "GDP growth (YoY)" ///
+              debt_gdp "Gross government debt (% GDP)" ///
+              sovereign_spread_brl "Sovereign risk (BRL)" ///
+              cf_cash_oper_to_tot_asset "Operating cash flow / total assets" ///
+              tot_debt_to_ebitda "Total debt / EBITDA" ///
+              days_to_maturity "Residual maturity (years, BUS/252)") ///
+    mtitles("M1: Global" ///
+            "M2: Local macro" ///
+            "M3: + Sovereign" ///
+            "M4: Sovereign parsimonious" ///
+            "M5: Full" ///
+            "M6: Brazil 3M") ///
+    b(4) se(4) ///
+    stats(N r2_w N_g rho, ///
+          fmt(0 4 0 4) ///
+          labels("Observations" ///
+                 "Within R-squared" ///
+                 "Number of bonds" ///
+                 "rho")) ///
+    star(* 0.10 ** 0.05 *** 0.01) ///
+    nocons nonotes ///
+    addnotes("Bond fixed effects in all specifications." ///
+             "Driscoll-Kraay standard errors with maximum lag 4." ///
+             "All columns use the same 3,918-observation sample (101 bonds)." ///
+             "Real Fed 3M uses SPF expected inflation." ///
+             "Real Brazil 3M uses Focus expected IPCA." ///
+             "RER is the bilateral USD/BRL CPI-based real exchange-rate index." ///
+             "* p<0.10, ** p<0.05, *** p<0.01")
+
+esttab M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK using ///
+    "`root'\src\econometrics\wp07_reestimation\Table5_Final_Six_Models_FE_DK.txt", ///
+    replace `table_options'
+
+esttab M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK using ///
+    "`root'\src\econometrics\wp07_reestimation\Table5_Final_Six_Models_FE_DK.rtf", ///
+    replace rtf `table_options'
+
+di as text "============================================================"
+di as result "FINAL SIX-MODEL FE-DK TABLE COMPLETED"
+di as result "Sample: 3,918 observations / 101 bonds / 48 issuers"
+di as result "Window: 2016m1-2025m6"
+di as result "DK maximum lag: 4"
+di as text "============================================================"
+
+log close
+exit
