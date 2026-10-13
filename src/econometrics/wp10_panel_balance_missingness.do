@@ -2,7 +2,7 @@
 * FINAL SPECIFICATION - SAMPLE AUDIT ONLY
 *
 * Purpose:
-*   Determine the estimation sample implied by Martin Grandes' final six-column
+*   Determine the estimation sample implied by the final seven-column
 *   FE-DK specification after incorporating:
 *     - Real Fed 3M (SPF expected inflation)
 *     - bilateral USD/BRL RER
@@ -175,15 +175,15 @@ label variable real_exchange_rate ///
 
 merge m:1 month_id using `real_fed_inputs'
 
-count if _merge == 2
+count if _merge != 3
 if r(N)>0 {
-    di as error "Real-Fed input contains months not present in frozen panel."
+    di as error "Real-Fed input does not match all frozen-panel observations."
     tab _merge
     exit 459
 }
 
-* Pre-2016 master-only observations are expected because the validated
-* Real-Fed SPF series begins in 2016m1.
+* Validated Real-Fed SPF coverage spans the full frozen-panel window,
+* 2010m12-2025m6, with no missing month-end observations.
 
 gen double fed_nominal_diff = ///
     abs(fed_3m_forward - ussoc_px_last) if _merge == 3
@@ -227,7 +227,7 @@ label variable real_brazil_3m_focus ///
     "Real Brazil 3M DI: nominal DI minus Focus expected IPCA"
 
 *===============================================================================
-* 8. MARTIN GRANDES FINAL SIX-COLUMN X-MATRIX
+* 8. FINAL SEVEN-COLUMN FE-DK X-MATRIX
 *
 * M1  Global factors
 * M2  Global + local macro
@@ -235,6 +235,7 @@ label variable real_brazil_3m_focus ///
 * M4  Global + sovereign risk
 * M5  Full: global + local + sovereign + firm/bond
 * M6  Global + local monetary 3M rate
+* M7  Brazil 3M robustness with Real Fed 3M omitted
 *
 * Source-accurate implementation:
 *   Real Fed      -> real_fed_3m_spf
@@ -289,11 +290,15 @@ local model6_x ///
     real_fed_3m_spf ///
     real_brazil_3m_focus
 
+local model7_x ///
+    vix ///
+    real_brazil_3m_focus
+
 *===============================================================================
 * 9. NATURAL COMPLETE-CASE SAMPLE BY MODEL
 *===============================================================================
 
-forvalues m = 1/6 {
+forvalues m = 1/7 {
     gen byte sample_m`m' = 1
     markout sample_m`m' spread `model`m'_x'
 
@@ -320,9 +325,9 @@ forvalues m = 1/6 {
 *===============================================================================
 * 10. COMMON FINAL TABLE SAMPLE
 *
-* M5 contains the union of all variables appearing anywhere in M1-M6.
+* M5 contains the union of all variables appearing anywhere in M1-M7.
 * Therefore its complete-case sample is the strict common sample required
-* to hold observations fixed across all six final columns.
+* to hold observations fixed across all seven final columns.
 *===============================================================================
 
 gen byte sample_common = sample_m5
@@ -347,7 +352,7 @@ local ncommon_issuers : word count `common_issuers'
 di as result "Common sample issuers: `ncommon_issuers'"
 
 * Verify common sample is admissible in every model.
-forvalues m = 1/6 {
+forvalues m = 1/7 {
     count if sample_common & !sample_m`m'
     if r(N)>0 {
         di as error ///
@@ -383,9 +388,6 @@ foreach v of local audit_vars {
     quietly count if missing(`v')
     local nmiss = r(N)
 
-    quietly count if month_id >= tm(2016m1) & missing(`v')
-    local nmiss2016 = r(N)
-
     tempvar bondmiss bondnonmiss
 
     bysort bond_id: egen long `bondmiss' = total(missing(`v'))
@@ -398,7 +400,7 @@ foreach v of local audit_vars {
     local bonds_all_missing = r(N)
 
     di as result ///
-        "`v': missing all-panel=`nmiss'; missing 2016+=`nmiss2016'; bonds with any missing=`bonds_any_missing'; bonds entirely missing=`bonds_all_missing'"
+        "`v': missing all-panel=`nmiss'; bonds with any missing=`bonds_any_missing'; bonds entirely missing=`bonds_all_missing'"
 
     drop `bondmiss' `bondnonmiss'
 }
@@ -454,16 +456,24 @@ if `frozen_obs' != 4648 {
     exit 459
 }
 
-if `final_obs' != 3918 {
-    di as error "WP-10 ERROR: final common sample does not contain 3,918 observations."
+if `final_obs' != 4648 {
+    di as error "WP-10 ERROR: final common sample does not contain 4,648 observations."
     exit 459
 }
 
-* Confirm that the entire 730-row bridge is explained by Real Fed availability.
-quietly count if sample_common != !missing(real_fed_3m_spf)
+* Final common sample must retain every frozen-panel observation.
+quietly count if !sample_common
 if r(N) > 0 {
     di as error ///
-        "WP-10 ERROR: final common sample differs from Real-Fed-available sample."
+        "WP-10 ERROR: final common sample excludes frozen-panel observations."
+    exit 459
+}
+
+* Real Fed 3M must also be available for every frozen-panel observation.
+quietly count if missing(real_fed_3m_spf)
+if r(N) > 0 {
+    di as error ///
+        "WP-10 ERROR: Real Fed 3M has missing frozen-panel observations."
     exit 459
 }
 
@@ -491,7 +501,7 @@ local frozen_months = r(N)
 quietly count if tag_month & month_in_final
 local final_months = r(N)
 
-if `frozen_bonds' != 103 | `final_bonds' != 101 {
+if `frozen_bonds' != 103 | `final_bonds' != 103 {
     di as error "WP-10 ERROR: bond counts do not match locked sample."
     exit 459
 }
@@ -501,8 +511,8 @@ if `frozen_issuers' != 48 | `final_issuers' != 48 {
     exit 459
 }
 
-if `final_months' != 114 {
-    di as error "WP-10 ERROR: final sample does not contain 114 months."
+if `final_months' != 175 {
+    di as error "WP-10 ERROR: final sample does not contain 175 months."
     exit 459
 }
 
@@ -524,7 +534,7 @@ local frozen_p95  = r(p95)
 local frozen_p99  = r(p99)
 local frozen_max  = r(max)
 
-* Final-sample distribution must be computed over the 101 retained bonds only.
+* Final-sample distribution is computed over all 103 retained bonds.
 quietly summarize n_common_rows if tag_bond & n_common_rows > 0, detail
 local final_min  = r(min)
 local final_p1   = r(p1)
@@ -630,6 +640,12 @@ gen double coverage_final = ///
 
 assert gaps_m_frozen >= 0
 assert gaps_m_final >= 0 if retained_final
+
+quietly count if tag_bond & gaps_m_frozen > 0
+local frozen_gap_bonds = r(N)
+
+quietly count if tag_bond & retained_final & gaps_m_final > 0
+local final_gap_bonds = r(N)
 
 gen str10 first_obs_frozen_iso = ///
     string(first_obs_frozen,"%tcCCYY-NN-DD")
@@ -754,9 +770,6 @@ postfile `misspost' ///
     long n_frozen ///
     long missing_frozen ///
     double missing_rate_frozen ///
-    long n_2016plus ///
-    long missing_2016plus ///
-    double missing_rate_2016plus ///
     long n_final ///
     long missing_final ///
     double missing_rate_final ///
@@ -774,14 +787,6 @@ foreach v of local audit_vars {
     local nmiss = r(N)
 
     local rate_frozen = `nmiss' / `n_total'
-
-    quietly count if month_id >= tm(2016m1)
-    local n2016 = r(N)
-
-    quietly count if month_id >= tm(2016m1) & missing(`v')
-    local nmiss2016 = r(N)
-
-    local rate2016 = `nmiss2016' / `n2016'
 
     quietly count if sample_common
     local nfin = r(N)
@@ -809,9 +814,6 @@ foreach v of local audit_vars {
         (`n_total') ///
         (`nmiss') ///
         (`rate_frozen') ///
-        (`n2016') ///
-        (`nmiss2016') ///
-        (`rate2016') ///
         (`nfin') ///
         (`nmissfin') ///
         (`ratefin') ///
@@ -932,9 +934,9 @@ replace months = `fed_months' in 2
 replace dropped_from_previous = `frozen_obs' - `fed_obs' in 2
 replace first_month = string(`fed_first_month',"%tm") in 2
 replace last_month = string(`fed_last_month',"%tm") in 2
-replace reason = "SPF-based Real Fed 3M begins in 2016m1" in 2
+replace reason = "SPF-based Real Fed 3M covers the full frozen-panel window" in 2
 
-replace stage = "Final six-model common sample" in 3
+replace stage = "Final seven-model common sample" in 3
 replace observations = `final_obs' in 3
 replace bonds = `final_bonds' in 3
 replace issuers = `final_issuers' in 3
@@ -964,7 +966,7 @@ replace value = string(`final_obs',"%12.0f") in 2
 
 replace metric = "Observations excluded" in 3
 replace value = string(`frozen_obs' - `final_obs',"%12.0f") in 3
-replace note = "Entire reduction is associated with Real Fed 3M availability" in 3
+replace note = "No observation loss: final common sample equals frozen WP-06 panel" in 3
 
 replace metric = "Frozen-panel bonds" in 4
 replace value = string(`frozen_bonds',"%12.0f") in 4
@@ -1004,18 +1006,18 @@ replace value = string(`final_p75',"%12.0f") in 14
 replace metric = "Observations per retained bond - maximum" in 15
 replace value = string(`final_max',"%12.0f") in 15
 
-replace metric = "Missing final-spec values from 2016m1 onward" in 16
-replace value = "0" in 16
-replace note = "All final-spec variables are complete over the retained date window" in 16
+replace metric = "Missing final-spec observations in frozen panel" in 16
+replace value = string(`frozen_obs' - `final_obs',"%12.0f") in 16
+replace note = "All final-spec variables are complete over the frozen-panel window" in 16
 
-replace metric = "Real Fed 3M start" in 17
-replace value = "2016m1" in 17
-replace note = "Validated SPF expected-inflation series determines final sample start" in 17
+replace metric = "Real Fed 3M coverage" in 17
+replace value = string(`fed_first_month',"%tm") + "-" + string(`fed_last_month',"%tm") in 17
+replace note = "Validated SPF expected-inflation series spans the full frozen-panel window" in 17
 
 replace metric = "Panel structure" in 18
 replace value = "Unbalanced" in 18
 replace note = ///
-    "Bonds enter and exit the sample at different dates; individual bond histories contain no internal monthly gaps" in 18
+    "Bonds enter and exit at different dates; internal-gap counts are reported in bond_coverage" in 18
 
 export delimited using ///
     "`wp10dir'\WP10_thesis_summary.csv", replace
@@ -1036,12 +1038,12 @@ gen str110 comment = ""
 replace item = "Observations" in 1
 replace frozen_panel = string(`frozen_obs',"%12.0f") in 1
 replace final_sample = string(`final_obs',"%12.0f") in 1
-replace comment = "730 observations excluded because validated Real Fed 3M begins in 2016m1" in 1
+replace comment = "No observations excluded; final seven-model common sample equals frozen panel" in 1
 
 replace item = "Bonds" in 2
 replace frozen_panel = string(`frozen_bonds',"%12.0f") in 2
 replace final_sample = string(`final_bonds',"%12.0f") in 2
-replace comment = "Two bonds end before 2016m1 and are fully excluded" in 2
+replace comment = "All 103 bonds are retained in the final common sample" in 2
 
 replace item = "Issuers" in 3
 replace frozen_panel = string(`frozen_issuers',"%12.0f") in 3
@@ -1085,19 +1087,19 @@ replace frozen_panel = string(`frozen_max',"%12.0f") in 11
 replace final_sample = string(`final_max',"%12.0f") in 11
 
 replace item = "Internal monthly gaps" in 12
-replace frozen_panel = "0 bonds" in 12
-replace final_sample = "0 bonds" in 12
-replace comment = "Unbalancedness reflects heterogeneous bond entry and exit dates, not internal gaps" in 12
+replace frozen_panel = trim(string(`frozen_gap_bonds',"%12.0f")) + " bonds" in 12
+replace final_sample = trim(string(`final_gap_bonds',"%12.0f")) + " bonds" in 12
+replace comment = "Internal gaps are measured within each bond observed first-to-last monthly span" in 12
 
 replace item = "Missing final-spec observations" in 13
-replace frozen_panel = "730" in 13
+replace frozen_panel = string(`frozen_obs' - `final_obs',"%12.0f") in 13
 replace final_sample = "0" in 13
-replace comment = "All 730 missing values are Real Fed 3M observations before 2016m1" in 13
+replace comment = "All final-spec variables are complete in the frozen panel and final sample" in 13
 
 replace item = "Panel structure" in 14
 replace frozen_panel = "Unbalanced" in 14
 replace final_sample = "Unbalanced" in 14
-replace comment = "Individual bond histories are contiguous within their observed spans" in 14
+replace comment = "Unbalancedness reflects heterogeneous entry and exit dates; internal gaps reported above" in 14
 
 export delimited using ///
     "`wp10dir'\WP10_thesis_table.csv", replace
@@ -1146,9 +1148,23 @@ export excel using "`wp10xlsx'", ///
 
 import delimited using ///
     "`wp10dir'\WP10_bond_variable_missingness.csv", clear
-export excel using "`wp10xlsx'", ///
-    sheet("bond_var_missingness", replace) ///
-    firstrow(variables)
+count
+if r(N) == 0 {
+    putexcel set "`wp10xlsx'", ///
+        sheet("bond_var_missingness", replace) modify
+    putexcel A1=("variable") ///
+        B1=("bond_id") ///
+        C1=("issuer") ///
+        D1=("observations") ///
+        E1=("missing_observations") ///
+        F1=("missing_rate") ///
+        G1=("missing_type")
+}
+else {
+    export excel using "`wp10xlsx'", ///
+        sheet("bond_var_missingness", replace) ///
+        firstrow(variables)
+}
 
 import delimited using ///
     "`wp10dir'\WP10_bond_coverage.csv", clear
