@@ -6,10 +6,10 @@
 *   common estimation sample implied by Martin Grandes' final specification.
 *
 * Final common sample expected:
-*   3,918 observations
-*   101 bonds
+*   4,648 observations
+*   103 bonds
 *   48 issuers
-*   2016m1 - 2025m6
+*   2010m12 - 2025m6
 *
 * Diagnostics:
 *   1. Pooled vs FE: Stata built-in F test after xtreg, fe
@@ -185,15 +185,15 @@ label variable real_exchange_rate ///
 
 merge m:1 month_id using `real_fed_inputs'
 
-count if _merge == 2
+count if _merge != 3
 if r(N)>0 {
-    di as error "Real-Fed input contains months not present in frozen panel."
+    di as error "Real-Fed input does not match all frozen-panel observations."
     tab _merge
     exit 459
 }
 
-* Pre-2016 master-only observations are expected because the validated
-* Real-Fed SPF series begins in 2016m1.
+* Validated Real-Fed SPF coverage now spans the full frozen-panel window,
+* 2010m12-2025m6, with no missing month-end observations.
 
 gen double fed_nominal_diff = ///
     abs(fed_3m_forward - ussoc_px_last) if _merge == 3
@@ -237,7 +237,7 @@ label variable real_brazil_3m_focus ///
     "Real Brazil 3M DI: nominal DI minus Focus expected IPCA"
 
 *===============================================================================
-* 8. MARTIN GRANDES FINAL SIX-COLUMN X-MATRIX
+* 8. FINAL SEVEN-COLUMN FE-DK X-MATRIX
 *
 * M1  Global factors
 * M2  Global + local macro
@@ -245,6 +245,7 @@ label variable real_brazil_3m_focus ///
 * M4  Global + sovereign risk
 * M5  Full: global + local + sovereign + firm/bond
 * M6  Global + local monetary 3M rate
+* M7  Brazil 3M robustness with Real Fed 3M omitted
 *
 * Source-accurate implementation:
 *   Real Fed      -> real_fed_3m_spf
@@ -299,11 +300,15 @@ local model6_x ///
     real_fed_3m_spf ///
     real_brazil_3m_focus
 
+local model7_x ///
+    vix ///
+    real_brazil_3m_focus
+
 *===============================================================================
 * 9. NATURAL COMPLETE-CASE SAMPLE BY MODEL
 *===============================================================================
 
-forvalues m = 1/6 {
+forvalues m = 1/7 {
     gen byte sample_m`m' = 1
     markout sample_m`m' spread `model`m'_x'
 
@@ -330,9 +335,9 @@ forvalues m = 1/6 {
 *===============================================================================
 * 10. COMMON FINAL TABLE SAMPLE
 *
-* M5 contains the union of all variables appearing anywhere in M1-M6.
+* M5 contains the union of all variables appearing anywhere in M1-M7.
 * Therefore its complete-case sample is the strict common sample required
-* to hold observations fixed across all six final columns.
+* to hold observations fixed across all seven final columns.
 *===============================================================================
 
 gen byte sample_common = sample_m5
@@ -357,7 +362,7 @@ local ncommon_issuers : word count `common_issuers'
 di as result "Common sample issuers: `ncommon_issuers'"
 
 * Verify common sample is admissible in every model.
-forvalues m = 1/6 {
+forvalues m = 1/7 {
     count if sample_common & !sample_m`m'
     if r(N)>0 {
         di as error ///
@@ -375,16 +380,16 @@ di as text "FINAL DIAGNOSTIC SAMPLE VALIDATION"
 
 count if sample_common
 di as result "Observations: " r(N)
-if r(N) != 3918 {
-    di as error "Expected 3,918 final-sample observations."
+if r(N) != 4648 {
+    di as error "Expected 4,648 final-sample observations."
     exit 459
 }
 
 levelsof bond_id if sample_common, local(diag_bonds)
 local nbonds : word count `diag_bonds'
 di as result "Bonds: `nbonds'"
-if `nbonds' != 101 {
-    di as error "Expected 101 final-sample bonds."
+if `nbonds' != 103 {
+    di as error "Expected 103 final-sample bonds."
     exit 459
 }
 
@@ -400,7 +405,7 @@ quietly summarize month_id if sample_common, meanonly
 di as result "First month: " %tm r(min)
 di as result "Last month:  " %tm r(max)
 
-if r(min) != tm(2016m1) | r(max) != tm(2025m6) {
+if r(min) != tm(2010m12) | r(max) != tm(2025m6) {
     di as error "Unexpected final-sample time window."
     exit 459
 }
@@ -507,8 +512,8 @@ di as result "xtserial return code: `xtserial_rc'"
 
 di as text "============================================================"
 di as result "FINAL DIAGNOSTICS COMPLETED"
-di as result "Sample: 3,918 observations / 101 bonds / 48 issuers"
-di as result "Window: 2016m1-2025m6"
+di as result "Sample: 4,648 observations / 103 bonds / 48 issuers"
+di as result "Window: 2010m12-2025m6"
 di as text "============================================================"
 
 log close
