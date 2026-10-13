@@ -1,18 +1,18 @@
 *===============================================================================
-* FINAL SPECIFICATION - SIX-MODEL FE DRISCOLL-KRAAY TABLE
+* FINAL SPECIFICATION - SEVEN-MODEL FE DRISCOLL-KRAAY TABLE
 *
 * Final common sample:
-*   3,918 observations
-*   101 bonds
+*   4,648 observations
+*   103 bonds
 *   48 issuers
-*   2016m1 - 2025m6
+*   2010m12 - 2025m6
 *
 * Estimator:
 *   Bond fixed effects
 *   Driscoll-Kraay standard errors
 *   Maximum lag = 4
 *
-* All six models use the same locked common sample.
+* All seven models use the same locked common sample.
 *===============================================================================
 clear all
 set more off
@@ -21,7 +21,7 @@ local root "C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira"
 
 capture log close
 log using ///
-    "`root'\src\econometrics\wp07_reestimation\Final_spec_six_models_fe_dk.log", ///
+    "`root'\src\econometrics\wp07_reestimation\Final_spec_seven_models_fe_dk.log", ///
     replace text
 
 *===============================================================================
@@ -172,15 +172,15 @@ label variable real_exchange_rate ///
 
 merge m:1 month_id using `real_fed_inputs'
 
-count if _merge == 2
+count if _merge != 3
 if r(N)>0 {
-    di as error "Real-Fed input contains months not present in frozen panel."
+    di as error "Real-Fed input does not match all frozen-panel observations."
     tab _merge
     exit 459
 }
 
-* Pre-2016 master-only observations are expected because the validated
-* Real-Fed SPF series begins in 2016m1.
+* Validated Real-Fed SPF coverage now spans the full frozen-panel window,
+* 2010m12-2025m6, with no missing month-end observations.
 
 gen double fed_nominal_diff = ///
     abs(fed_3m_forward - ussoc_px_last) if _merge == 3
@@ -224,7 +224,7 @@ label variable real_brazil_3m_focus ///
     "Real Brazil 3M DI: nominal DI minus Focus expected IPCA"
 
 *===============================================================================
-* 8. MARTIN GRANDES FINAL SIX-COLUMN X-MATRIX
+* 8. FINAL SEVEN-COLUMN FE-DK X-MATRIX
 *
 * M1  Global factors
 * M2  Global + local macro
@@ -232,6 +232,7 @@ label variable real_brazil_3m_focus ///
 * M4  Global + sovereign risk
 * M5  Full: global + local + sovereign + firm/bond
 * M6  Global + local monetary 3M rate
+* M7  Brazil 3M robustness with Real Fed 3M omitted
 *
 * Source-accurate implementation:
 *   Real Fed      -> real_fed_3m_spf
@@ -286,11 +287,15 @@ local model6_x ///
     real_fed_3m_spf ///
     real_brazil_3m_focus
 
+local model7_x ///
+    vix ///
+    real_brazil_3m_focus
+
 *===============================================================================
 * 9. NATURAL COMPLETE-CASE SAMPLE BY MODEL
 *===============================================================================
 
-forvalues m = 1/6 {
+forvalues m = 1/7 {
     gen byte sample_m`m' = 1
     markout sample_m`m' spread `model`m'_x'
 
@@ -317,9 +322,9 @@ forvalues m = 1/6 {
 *===============================================================================
 * 10. COMMON FINAL TABLE SAMPLE
 *
-* M5 contains the union of all variables appearing anywhere in M1-M6.
+* M5 contains the union of all variables appearing anywhere in M1-M7.
 * Therefore its complete-case sample is the strict common sample required
-* to hold observations fixed across all six final columns.
+* to hold observations fixed across all seven final columns.
 *===============================================================================
 
 gen byte sample_common = sample_m5
@@ -344,7 +349,7 @@ local ncommon_issuers : word count `common_issuers'
 di as result "Common sample issuers: `ncommon_issuers'"
 
 * Verify common sample is admissible in every model.
-forvalues m = 1/6 {
+forvalues m = 1/7 {
     count if sample_common & !sample_m`m'
     if r(N)>0 {
         di as error ///
@@ -358,15 +363,15 @@ forvalues m = 1/6 {
 *===============================================================================
 
 count if sample_common
-if r(N) != 3918 {
-    di as error "Expected 3,918 final-sample observations."
+if r(N) != 4648 {
+    di as error "Expected 4,648 final-sample observations."
     exit 459
 }
 
 levelsof bond_id if sample_common, local(final_bonds)
 local n_final_bonds : word count `final_bonds'
-if `n_final_bonds' != 101 {
-    di as error "Expected 101 bonds in final sample."
+if `n_final_bonds' != 103 {
+    di as error "Expected 103 bonds in final sample."
     exit 459
 }
 
@@ -391,10 +396,10 @@ if _rc {
 }
 
 *===============================================================================
-* 13. ESTIMATE FINAL SIX MODELS
+* 13. ESTIMATE FINAL SEVEN MODELS
 *===============================================================================
 
-forvalues m = 1/6 {
+forvalues m = 1/7 {
 
     di as text "============================================================"
     di as text "FINAL FE-DK MODEL `m'"
@@ -407,13 +412,13 @@ forvalues m = 1/6 {
     local m`m'_Ng  = e(N_g)
     local m`m'_r2w = e(r2_w)
 
-    if `m`m'_N' != 3918 {
-        di as error "Model `m' does not use 3,918 observations."
+    if `m`m'_N' != 4648 {
+        di as error "Model `m' does not use 4,648 observations."
         exit 459
     }
 
-    if `m`m'_Ng' != 101 {
-        di as error "Model `m' does not use 101 bonds."
+    if `m`m'_Ng' != 103 {
+        di as error "Model `m' does not use 103 bonds."
         exit 459
     }
 
@@ -428,7 +433,7 @@ forvalues m = 1/6 {
 * 14. SIDE-BY-SIDE VALIDATION
 *===============================================================================
 
-estimates table M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK, ///
+estimates table M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK M7_DK, ///
     b(%9.4f) se(%9.4f) stats(N r2_w)
 
 *===============================================================================
@@ -464,7 +469,8 @@ local table_options ///
             "M3: + Sovereign" ///
             "M4: Sovereign parsimonious" ///
             "M5: Full" ///
-            "M6: Brazil 3M") ///
+            "M6: Brazil 3M + Real Fed" ///
+            "M7: Brazil 3M; Fed omitted") ///
     b(4) se(4) ///
     stats(N r2_w N_g rho, ///
           fmt(0 4 0 4) ///
@@ -476,24 +482,25 @@ local table_options ///
     nocons nonotes ///
     addnotes("Bond fixed effects in all specifications." ///
              "Driscoll-Kraay standard errors with maximum lag 4." ///
-             "All columns use the same 3,918-observation sample (101 bonds)." ///
+             "All columns use the same 4,648-observation sample (103 bonds)." ///
              "Real Fed 3M uses SPF expected inflation." ///
              "Real Brazil 3M uses Focus expected IPCA." ///
              "RER is the bilateral USD/BRL CPI-based real exchange-rate index." ///
+             "M7 repeats the Brazil 3M robustness exercise with Real Fed 3M omitted." ///
              "* p<0.10, ** p<0.05, *** p<0.01")
 
-esttab M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK using ///
-    "`root'\src\econometrics\wp07_reestimation\Table5_Final_Six_Models_FE_DK.txt", ///
+esttab M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK M7_DK using ///
+    "`root'\src\econometrics\wp07_reestimation\Table5_Final_Seven_Models_FE_DK.txt", ///
     replace `table_options'
 
-esttab M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK using ///
-    "`root'\src\econometrics\wp07_reestimation\Table5_Final_Six_Models_FE_DK.rtf", ///
+esttab M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK M7_DK using ///
+    "`root'\src\econometrics\wp07_reestimation\Table5_Final_Seven_Models_FE_DK.rtf", ///
     replace rtf `table_options'
 
 di as text "============================================================"
-di as result "FINAL SIX-MODEL FE-DK TABLE COMPLETED"
-di as result "Sample: 3,918 observations / 101 bonds / 48 issuers"
-di as result "Window: 2016m1-2025m6"
+di as result "FINAL SEVEN-MODEL FE-DK TABLE COMPLETED"
+di as result "Sample: 4,648 observations / 103 bonds / 48 issuers"
+di as result "Window: 2010m12-2025m6"
 di as result "DK maximum lag: 4"
 di as text "============================================================"
 
