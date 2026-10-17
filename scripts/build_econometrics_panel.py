@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import sys
 
 from dataclasses import dataclass
@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-from finmath.termstructure.curve_models import flat_forward_interpolation
+from finmath.termstructure.curve_models import CurveBootstrap, flat_forward_interpolation
 from src.config import CONFIG
 from src.core.curve_builder import (
     build_real_curve_for_date,
@@ -33,6 +33,7 @@ from src.core.curve_builder import (
 from src.core.spread_calculator import (
     compute_spreads,
     compute_spreads_ltn,
+    geometric_spread_bps_from_pct,
 )
 from src.core.windowing import build_observation_windows
 from src.utils.file_io import (
@@ -50,6 +51,7 @@ from src.utils.filters import (
 )
 from src.utils.interpolation import (
     interpolate_di_surface,
+    interpolate_raw_di_yield_for_tenor,
     interpolate_surface,
 )
 
@@ -76,7 +78,7 @@ LEGACY_PANEL = ECONOMETRICS_DIR / "panel_main_and_robustness.xlsx"
 
 # IMPORTANT:
 # Never overwrite the frozen legacy panel during development/reconciliation.
-OUTPUT_PANEL = ECONOMETRICS_DIR / "panel_main_and_robustness_rebuilt.xlsx"
+OUTPUT_PANEL = ECONOMETRICS_DIR / "panel_main_and_robustness_rebuilt_v2.xlsx"
 
 BOND_METADATA = DOMESTIC_DIR / "universo_brazil_deb_des.xlsx"
 MACRO_WORKBOOK = MACRO_DIR / "macro_explanatory_variables.xlsx"
@@ -87,7 +89,7 @@ FED_3M_FORWARD = (
     / "ussoc_monthly_2010_2025.csv"
 )
 
-GOVT_YAS = GOVT_DIR / "govt_ya_ande.v3.xlsx"
+GOVT_YAS = GOVT_DIR / "govt_ya_ande.v6.xlsx"
 
 CF_CASH_FROM_OPER = FUNDAMENTALS_DIR / "CF_CASH_FROM_OPER.xlsx"
 BS_TOT_ASSET = FUNDAMENTALS_DIR / "BS_TOT_ASSET.xlsx"
@@ -104,7 +106,7 @@ WLA_CURVE = (
 
 GOVT_METADATA = (
     DOMESTIC_DIR
-    / "domestic_sovereign_curve_brazil.v2.xlsx"
+    / "domestic_sovereign_curve_brazil.v5.xlsx"
 )
 
 
@@ -2198,80 +2200,51 @@ def build_sovereign_spread(
     spine: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Map the validated nominal local-currency sovereign spread to each
-    corporate bond-date observation.
+    Build the nominal BRL sovereign zero curve from LTN and NTN-F
+    securities and map the sovereign-vs-DI spread to each corporate
+    bond-date observation at its exact BUS/252 residual tenor.
 
-    Step 1
-    ------
-    Rebuild the sovereign market observations using the frozen WP-02
-    methodology:
+    LTNs are direct zero-coupon anchors. Multi-cash-flow NTN-Fs extend
+    the sovereign zero curve by cash-flow stripping. An NTN-F with only
+    one remaining cash flow is retained as a zero node only when no LTN
+    exists at the same BUS/252 tenor.
 
-        sovereign spread =
-            Brazilian LTN / NTN-F YTM
-            versus same-date DI yield
-            at the exact BUS/252 residual tenor
-
-    The spread itself is annual-effective geometric bps, as implemented
-    by the production spread calculators.
-
-    Step 2
-    ------
-    On each sovereign observation date, interpret the available
-    LTN / NTN-F observations as nodes of a sovereign-spread term
-    structure:
-
-        residual BUS/252 tenor -> sovereign spread (bps)
-
-    Each corporate bond is evaluated at its own BUS/252 residual tenor
-    using the repository's ANBIMA flat-forward interpolation.
-
-    Mapping convention
-    ------------------
-    * exact sovereign tenor:
-          use the observed node;
-    * target between two sovereign nodes:
-          flat-forward interpolation;
-    * target shorter than the shortest node:
-          flat extrapolation from the shortest node;
-    * target longer than the longest node:
-          flat extrapolation from the longest node;
-    * only one sovereign node on a date:
-          use that node across all corporate maturities;
-    * no LTN / NTN-F observation on the corporate observation date:
-          leave sovereign_spread_brl missing.
-
-    There is deliberately NO interpolation or extrapolation across time.
-    In particular, no 2016 sovereign observation is carried backward
-    into 2010-2015.
-
-    Duplicate same-date / same-tenor government observations
-    --------------------------------------------------------
-    If both an LTN and an NTN-F produce the same BUS/252 residual tenor,
-    their sovereign spreads are averaged in bps to create one unique
-    curve node. This avoids making the mapped value depend on arbitrary
-    row ordering while retaining information from both eligible nominal
-    government instruments.
+    Sovereign zero and DI zero yields are interpolated separately at
+    the corporate residual tenor. The final spread is geometric.
     """
 
-    # --------------------------------------------------------------
-    # Canonical upstream government inputs
-    # --------------------------------------------------------------
+    dc = DayCounts(
+        "bus/252",
+        calendar="cdr_anbima",
+    )
+
     govt_base_raw = load_govt_bond_data(
         inputs.govt_metadata
-    )
+    ).copy()
 
     yields_ts = load_yield_surface(
         inputs.govt_yas
-    )
+    ).copy()
 
     di_surface = load_di_surface(
         CONFIG["HIST_CURVE_PATH"]
     )
 
-    yc_table = interpolate_di_surface(
-        di_surface,
-        CONFIG["TENORS"],
-    )
+    yields_ts.index = pd.to_datetime(
+        yields_ts.index,
+        errors="raise",
+    ).normalize()
+
+    if yields_ts.index.duplicated().any():
+        raise AssertionError(
+            "Duplicate observation dates in sovereign YAS surface."
+        )
+
+    for column in ["ISSUE_DT", "MATURITY"]:
+        govt_base_raw[column] = pd.to_datetime(
+            govt_base_raw[column],
+            errors="coerce",
+        )
 
     eligible_ids = set(yields_ts.columns)
 
@@ -2279,238 +2252,280 @@ def build_sovereign_spread(
         govt_base_raw["id"].isin(eligible_ids)
     ].copy()
 
-    sovereign_parts: list[pd.DataFrame] = []
-
-    # --------------------------------------------------------------
-    # LTN
-    # --------------------------------------------------------------
     ltn_base = filter_government_universe(
         govt_base_raw.copy(),
         inflation_linked="N",
         bond_type="LTN",
-    )
+    ).copy()
 
-    if not ltn_base.empty:
-        ltn_rows = []
-
-        for bond_id in ltn_base["id"].unique():
-            if bond_id not in yields_ts.columns:
-                continue
-
-            part = pd.DataFrame(
-                {
-                    "id": bond_id,
-                    "OBS_DATE": yields_ts.index,
-                    "YAS_BOND_YLD": yields_ts[bond_id],
-                }
-            )
-
-            part = part.merge(
-                ltn_base[
-                    [
-                        "id",
-                        "MATURITY",
-                    ]
-                ],
-                on="id",
-                how="left",
-                validate="many_to_one",
-            )
-
-            ltn_rows.append(part)
-
-        if ltn_rows:
-            ltn_expanded = pd.concat(
-                ltn_rows,
-                ignore_index=True,
-            )
-
-            ltn_spreads = compute_spreads_ltn(
-                df_ltn=ltn_expanded,
-                yc_table=yc_table,
-                di_surface=di_surface,
-            )
-
-            ltn_spreads = anomaly_filtering_results(
-                ltn_spreads
-            )
-
-            ltn_spreads["TYPE"] = "LTN"
-            sovereign_parts.append(ltn_spreads)
-
-    # --------------------------------------------------------------
-    # NTN-F
-    # --------------------------------------------------------------
     ntnf_base = filter_government_universe(
         govt_base_raw.copy(),
         inflation_linked="N",
         bond_type="NTNF",
-    )
+    ).copy()
 
-    ntnf_skipped = []
+    ltn_base["TYPE"] = "LTN"
+    ntnf_base["TYPE"] = "NTNF"
 
-    if not ntnf_base.empty:
-        ntnf_windows = build_observation_windows(
-            ntnf_base,
-            yields_ts,
-            CONFIG["OBS_WINDOW"],
-        )
-
-        ntnf_spreads, ntnf_skipped = compute_spreads(
-            ntnf_base,
-            yields_ts,
-            yc_table,
-            ntnf_windows,
-            CONFIG["TENORS"],
-            di_surface=di_surface,
-        )
-
-        ntnf_spreads = anomaly_filtering_results(
-            ntnf_spreads
-        )
-
-        ntnf_spreads["TYPE"] = "NTNF"
-        sovereign_parts.append(ntnf_spreads)
-
-    if not sovereign_parts:
-        raise AssertionError(
-            "No valid LTN / NTN-F sovereign observations were rebuilt."
-        )
-
-    sovereign_points = pd.concat(
-        sovereign_parts,
+    nominal_base = pd.concat(
+        [ltn_base, ntnf_base],
         ignore_index=True,
     )
 
     required = {
         "id",
-        "OBS_DATE",
-        "TENOR_YRS",
-        "SPREAD",
         "TYPE",
+        "ISSUE_DT",
+        "MATURITY",
+        "CPN",
+        "CPN_FREQ",
     }
 
-    missing_columns = required.difference(
-        sovereign_points.columns
+    missing = required.difference(
+        nominal_base.columns
     )
 
-    if missing_columns:
+    if missing:
         raise AssertionError(
-            "Rebuilt sovereign observations are missing columns: "
-            f"{sorted(missing_columns)}"
+            "Missing sovereign metadata fields: "
+            f"{sorted(missing)}"
         )
 
-    sovereign_points["OBS_DATE"] = pd.to_datetime(
-        sovereign_points["OBS_DATE"],
-        errors="raise",
-    ).dt.normalize()
-
-    sovereign_points["TENOR_YRS"] = pd.to_numeric(
-        sovereign_points["TENOR_YRS"],
-        errors="raise",
-    )
-
-    sovereign_points["SPREAD"] = pd.to_numeric(
-        sovereign_points["SPREAD"],
-        errors="raise",
-    )
-
-    sovereign_points = sovereign_points[
-        sovereign_points["TENOR_YRS"].notna()
-        & sovereign_points["SPREAD"].notna()
-        & (sovereign_points["TENOR_YRS"] > 0)
+    nominal_base = nominal_base[
+        nominal_base["ISSUE_DT"].notna()
+        & nominal_base["MATURITY"].notna()
     ].copy()
 
-    sovereign_points = (
-        sovereign_points
-        .sort_values(
-            [
-                "OBS_DATE",
-                "TENOR_YRS",
-                "TYPE",
-                "id",
-            ]
+    nominal_base = nominal_base.sort_values(
+        ["MATURITY", "TYPE", "id"]
+    ).reset_index(drop=True)
+
+    spine_dates = sorted(
+        pd.to_datetime(
+            spine["obs_date"],
+            errors="raise",
         )
-        .reset_index(drop=True)
+        .dt.normalize()
+        .unique()
     )
 
-    # Reconciliation after extending the validated ANDE/YAS
-    # sovereign history back through 2010-2015.
-    type_counts = (
-        sovereign_points
-        .groupby("TYPE")
-        .size()
-        .to_dict()
-    )
-
-    expected_counts = {
-        "LTN": 894,
-        "NTNF": 730,
-    }
-
-    if type_counts != expected_counts:
-        raise AssertionError(
-            "Sovereign WP-02 observation counts changed. "
-            f"Expected {expected_counts}, got {type_counts}."
-        )
-
-    if len(sovereign_points) != 1624:
-        raise AssertionError(
-            "Expected 1624 sovereign LTN/NTN-F observations, "
-            f"got {len(sovereign_points)}."
-        )
-
-    duplicate_groups = (
-        sovereign_points
-        .groupby(
-            [
-                "OBS_DATE",
-                "TENOR_YRS",
-            ]
-        )
-        .size()
-    )
-
-    duplicate_groups = duplicate_groups[
-        duplicate_groups > 1
-    ]
-
-    # --------------------------------------------------------------
-    # Build a unique sovereign curve for each observation date.
-    #
-    # Duplicate date/tenor observations are averaged in bps.
-    # --------------------------------------------------------------
     curves = {}
+    curve_stats = {}
 
-    for obs_date, group in sovereign_points.groupby(
-        "OBS_DATE",
-        sort=True,
-    ):
-        nodes = (
-            group
-            .groupby(
-                "TENOR_YRS",
-                as_index=False,
+    raw_valid_points = 0
+    used_bootstrap_inputs = 0
+    kept_single_cf_ntnf = 0
+    dropped_single_cf_ntnf = 0
+
+    for obs_date_value in spine_dates:
+        obs_date = pd.Timestamp(
+            obs_date_value
+        ).normalize()
+
+        if obs_date not in yields_ts.index:
+            continue
+
+        active = nominal_base[
+            (nominal_base["ISSUE_DT"] <= obs_date)
+            & (nominal_base["MATURITY"] > obs_date)
+        ].copy()
+
+        candidates = []
+
+        for _, bond in active.iterrows():
+            bond_id = bond["id"]
+
+            if bond_id not in yields_ts.columns:
+                continue
+
+            ytm_pct = pd.to_numeric(
+                yields_ts.at[obs_date, bond_id],
+                errors="coerce",
             )
-            .agg(
-                sovereign_spread_node_bps=(
-                    "SPREAD",
-                    "mean",
-                ),
-                raw_instruments_at_tenor=(
-                    "SPREAD",
-                    "size",
-                ),
+
+            if pd.isna(ytm_pct) or float(ytm_pct) == 0.0:
+                continue
+
+            candidates.append(
+                (bond, float(ytm_pct) / 100.0)
             )
-            .sort_values("TENOR_YRS")
-            .reset_index(drop=True)
+
+        raw_valid_points += len(candidates)
+
+        ltn_tenors = set()
+
+        for bond, _ in candidates:
+            if bond["TYPE"] != "LTN":
+                continue
+
+            payment_date = dc.following(
+                bond["MATURITY"].date()
+            )
+
+            ltn_tenors.add(
+                dc.tf(
+                    obs_date.date(),
+                    payment_date,
+                )
+            )
+
+        cash_flows = []
+        rates = []
+
+        used_ltn = 0
+        used_ntnf = 0
+
+        for bond, ytm_dec in candidates:
+
+            if bond["TYPE"] == "LTN":
+                payment_date = dc.following(
+                    bond["MATURITY"].date()
+                )
+
+                cf = pd.Series(
+                    [100.0],
+                    index=[payment_date],
+                    dtype=float,
+                )
+
+                used_ltn += 1
+
+            else:
+                coupon_pct = pd.to_numeric(
+                    bond["CPN"],
+                    errors="coerce",
+                )
+
+                frequency = pd.to_numeric(
+                    bond["CPN_FREQ"],
+                    errors="coerce",
+                )
+
+                if pd.isna(coupon_pct) or pd.isna(frequency):
+                    raise AssertionError(
+                        f"Missing NTN-F coupon metadata for {bond['id']}."
+                    )
+
+                frequency = int(frequency)
+
+                if frequency != 2:
+                    raise AssertionError(
+                        f"Unexpected NTN-F coupon frequency "
+                        f"{frequency} for {bond['id']}."
+                    )
+
+                coupon_cash_flow = (
+                    (
+                        1.0 + float(coupon_pct) / 100.0
+                    )
+                    ** (1.0 / frequency)
+                    - 1.0
+                ) * 100.0
+
+                expiry = bond["MATURITY"].date()
+
+                payment_dates = [
+                    dc.following(expiry)
+                ]
+
+                payment_date = dc.workday(
+                    dc.eom(
+                        dc.following(expiry),
+                        offset=-7,
+                    ),
+                    1,
+                )
+
+                while payment_date > dc.following(
+                    obs_date.date()
+                ):
+                    payment_dates.append(
+                        payment_date
+                    )
+
+                    payment_date = dc.workday(
+                        dc.eom(
+                            payment_date,
+                            offset=-7,
+                        ),
+                        1,
+                    )
+
+                payment_dates = sorted(
+                    payment_dates
+                )
+
+                cf = pd.Series(
+                    coupon_cash_flow,
+                    index=payment_dates,
+                    dtype=float,
+                )
+
+                cf.iloc[-1] += 100.0
+
+                if len(cf) == 1:
+                    tenor = dc.tf(
+                        obs_date.date(),
+                        max(cf.index),
+                    )
+
+                    if tenor in ltn_tenors:
+                        dropped_single_cf_ntnf += 1
+                        continue
+
+                    kept_single_cf_ntnf += 1
+
+                used_ntnf += 1
+
+            cash_flows.append(cf)
+            rates.append(ytm_dec)
+
+        used_bootstrap_inputs += len(cash_flows)
+
+        if not cash_flows:
+            continue
+
+        if used_ltn == 0:
+            raise AssertionError(
+                "No valid LTN anchor on sovereign curve date "
+                f"{obs_date.date()}."
+            )
+
+        bootstrap = CurveBootstrap(
+            cash_flows=cash_flows,
+            rates=rates,
+            day_count_convention="bus/252",
+            calendar="cdr_anbima",
+            ref_date=obs_date.date(),
         )
 
-        curves[pd.Timestamp(obs_date).normalize()] = nodes
+        zero_curve = (
+            bootstrap.zero_curve
+            .dropna()
+            .astype(float)
+            .sort_index()
+        )
 
-    # --------------------------------------------------------------
-    # Same-date mapping to each corporate residual tenor
-    # --------------------------------------------------------------
+        duplicate_tenors = zero_curve.index[
+            zero_curve.index.duplicated()
+        ].tolist()
+
+        if duplicate_tenors:
+            raise AssertionError(
+                "Duplicate sovereign zero-curve tenors on "
+                f"{obs_date.date()}: {duplicate_tenors}"
+            )
+
+        curves[obs_date] = zero_curve
+
+        curve_stats[obs_date] = {
+            "raw_inputs": len(candidates),
+            "used_inputs": len(cash_flows),
+            "used_ltn": used_ltn,
+            "used_ntnf": used_ntnf,
+            "zero_nodes": len(zero_curve),
+        }
+
     rows = []
 
     for row in spine[
@@ -2529,14 +2544,18 @@ def build_sovereign_spread(
             row.days_to_maturity
         )
 
-        nodes = curves.get(obs_date)
+        zero_curve = curves.get(
+            obs_date
+        )
 
-        if nodes is None or nodes.empty:
+        if zero_curve is None or zero_curve.empty:
             rows.append(
                 {
                     "bond_id": row.bond_id,
                     "obs_date": obs_date,
                     "sovereign_spread_brl": np.nan,
+                    "sovereign_zero_yield_pct": np.nan,
+                    "di_zero_yield_pct": np.nan,
                     "sovereign_mapping_method": "no_same_date_curve",
                     "sovereign_nodes_on_date": 0,
                     "sovereign_unique_tenors_on_date": 0,
@@ -2546,19 +2565,8 @@ def build_sovereign_spread(
             )
             continue
 
-        tenor_values = nodes[
-            "TENOR_YRS"
-        ].to_numpy(dtype=float)
-
-        spread_values_bps = nodes[
-            "sovereign_spread_node_bps"
-        ].to_numpy(dtype=float)
-
-        n_unique = len(nodes)
-        n_raw = int(
-            nodes[
-                "raw_instruments_at_tenor"
-            ].sum()
+        tenor_values = zero_curve.index.to_numpy(
+            dtype=float
         )
 
         min_tenor = float(
@@ -2568,12 +2576,12 @@ def build_sovereign_spread(
             tenor_values.max()
         )
 
-        distance = np.abs(
-            tenor_values - target_tenor
-        )
-
         nearest_pos = int(
-            np.argmin(distance)
+            np.argmin(
+                np.abs(
+                    tenor_values - target_tenor
+                )
+            )
         )
 
         if np.isclose(
@@ -2582,50 +2590,64 @@ def build_sovereign_spread(
             rtol=0.0,
             atol=1e-12,
         ):
-            mapped_bps = float(
-                spread_values_bps[nearest_pos]
+            sovereign_zero_dec = float(
+                zero_curve.iloc[nearest_pos]
             )
 
-            method = "exact_node"
-
-        elif n_unique == 1:
-            mapped_bps = float(
-                spread_values_bps[0]
-            )
-
-            method = "single_node_flat"
+            method = "exact_zero_node"
 
         else:
-            # flat_forward_interpolation expects decimal annual rates.
-            # sovereign spreads are stored in basis points.
-            curve_decimal = pd.Series(
-                spread_values_bps / 10000.0,
-                index=tenor_values,
-            )
-
-            mapped_bps = float(
+            sovereign_zero_dec = float(
                 flat_forward_interpolation(
                     target_tenor,
-                    curve_decimal,
+                    zero_curve,
                 )
-                * 10000.0
             )
 
-            if target_tenor < min_tenor:
-                method = "flat_below_range"
+            if len(zero_curve) == 1:
+                method = "single_zero_node_flat"
+            elif target_tenor < min_tenor:
+                method = "zero_curve_flat_below_range"
             elif target_tenor > max_tenor:
-                method = "flat_above_range"
+                method = "zero_curve_flat_above_range"
             else:
-                method = "flat_forward_interpolation"
+                method = "zero_curve_flat_forward"
+
+        sovereign_zero_pct = (
+            sovereign_zero_dec * 100.0
+        )
+
+        di_zero_pct = (
+            interpolate_raw_di_yield_for_tenor(
+                surface=di_surface,
+                obs_date=obs_date,
+                target_tenor=target_tenor,
+            )
+        )
+
+        if pd.isna(di_zero_pct):
+            mapped_bps = np.nan
+            method = "no_same_date_di_curve"
+        else:
+            mapped_bps = (
+                geometric_spread_bps_from_pct(
+                    corporate_yield_pct=sovereign_zero_pct,
+                    benchmark_yield_pct=di_zero_pct,
+                )
+            )
+
+        stats = curve_stats[obs_date]
 
         rows.append(
             {
                 "bond_id": row.bond_id,
                 "obs_date": obs_date,
                 "sovereign_spread_brl": mapped_bps,
+                "sovereign_zero_yield_pct": sovereign_zero_pct,
+                "di_zero_yield_pct": di_zero_pct,
                 "sovereign_mapping_method": method,
-                "sovereign_nodes_on_date": n_raw,
-                "sovereign_unique_tenors_on_date": n_unique,
+                "sovereign_nodes_on_date": stats["used_inputs"],
+                "sovereign_unique_tenors_on_date": len(zero_curve),
                 "sovereign_min_tenor": min_tenor,
                 "sovereign_max_tenor": max_tenor,
             }
@@ -2640,10 +2662,7 @@ def build_sovereign_spread(
         )
 
     if mapped.duplicated(
-        [
-            "bond_id",
-            "obs_date",
-        ]
+        ["bond_id", "obs_date"]
     ).any():
         raise AssertionError(
             "Duplicate bond-date keys in sovereign mapping."
@@ -2663,52 +2682,31 @@ def build_sovereign_spread(
     )
 
     actual_nonmissing = int(
-        mapped[
-            "sovereign_spread_brl"
-        ]
+        mapped["sovereign_spread_brl"]
         .notna()
         .sum()
     )
 
     if actual_nonmissing != expected_nonmissing:
         raise AssertionError(
-            "Same-date sovereign mapping coverage mismatch: "
+            "Same-date sovereign/DI mapping coverage mismatch: "
             f"expected {expected_nonmissing:,}, "
             f"got {actual_nonmissing:,}."
         )
 
-    # Explicitly verify that no missing-date observation was time-filled.
-    no_curve_mask = mapped[
-        "sovereign_mapping_method"
-    ].eq("no_same_date_curve")
-
-    if mapped.loc[
-        no_curve_mask,
-        "sovereign_spread_brl",
-    ].notna().any():
-        raise AssertionError(
-            "A sovereign spread was populated without a same-date "
-            "LTN/NTN-F curve."
-        )
-
-    mapped.attrs[
-        "sovereign_raw_points"
-    ] = len(sovereign_points)
-
-    mapped.attrs[
-        "sovereign_curve_dates"
-    ] = len(curves)
-
-    mapped.attrs[
-        "duplicate_date_tenor_groups"
-    ] = len(duplicate_groups)
-
-    mapped.attrs[
-        "ntnf_skipped"
-    ] = len(ntnf_skipped)
+    mapped.attrs["sovereign_raw_points"] = raw_valid_points
+    mapped.attrs["sovereign_bootstrap_inputs"] = used_bootstrap_inputs
+    mapped.attrs["sovereign_zero_nodes"] = sum(
+        len(curve)
+        for curve in curves.values()
+    )
+    mapped.attrs["sovereign_curve_dates"] = len(curves)
+    mapped.attrs["duplicate_date_tenor_groups"] = 0
+    mapped.attrs["single_cf_ntnf_kept"] = kept_single_cf_ntnf
+    mapped.attrs["single_cf_ntnf_dropped"] = dropped_single_cf_ntnf
+    mapped.attrs["ntnf_skipped"] = dropped_single_cf_ntnf
 
     return mapped
-
 
 
 # ---------------------------------------------------------------------
@@ -3219,16 +3217,28 @@ def main() -> None:
 
     print("\nSOVEREIGN SPREAD BRL")
     print(
-        "  raw LTN/NTNF points : "
+        "  raw sovereign inputs: "
         f"{sovereign_spread.attrs['sovereign_raw_points']:,}"
+    )
+    print(
+        "  bootstrap inputs    : "
+        f"{sovereign_spread.attrs['sovereign_bootstrap_inputs']:,}"
+    )
+    print(
+        "  zero-curve nodes    : "
+        f"{sovereign_spread.attrs['sovereign_zero_nodes']:,}"
     )
     print(
         "  sovereign dates     : "
         f"{sovereign_spread.attrs['sovereign_curve_dates']:,}"
     )
     print(
-        "  duplicate tenor/date: "
-        f"{sovereign_spread.attrs['duplicate_date_tenor_groups']:,}"
+        "  single-CF NTN-F kept: "
+        f"{sovereign_spread.attrs['single_cf_ntnf_kept']:,}"
+    )
+    print(
+        "  single-CF NTN-F drop: "
+        f"{sovereign_spread.attrs['single_cf_ntnf_dropped']:,}"
     )
     print(
         "  mapped bond-dates    : "

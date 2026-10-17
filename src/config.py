@@ -9,7 +9,7 @@ while not (REPO_ROOT / ".git").exists() and REPO_ROOT != REPO_ROOT.parent:
 # Caminhos centralizados para os arquivos de dados
 CONFIG = {
     "CORP_PATH": REPO_ROOT / "datos_y_modelos" / "Domestic" / "universo_brazil_deb_des.xlsx",
-    "GOVT_PATH": REPO_ROOT / "datos_y_modelos" / "Domestic" / "domestic_sovereign_curve_brazil.v2.xlsx",
+    "GOVT_PATH": REPO_ROOT / "datos_y_modelos" / "Domestic" / "domestic_sovereign_curve_brazil.v5.xlsx",
     "YA_PATH": REPO_ROOT / "datos_y_modelos" / "db" / "brazil_domestic_corp_bonds" / "ya.v1.xlsx",
     "CORP_IPCA_MONTHLY_YTM_PATH": (
         REPO_ROOT
@@ -18,7 +18,7 @@ CONFIG = {
         / "brazil_domestic_corp_bonds"
         / "corp_yld_ytm_mid_revised_monthly.v1.xlsx"
     ),
-    "GOVT_YA_PATH": REPO_ROOT / "datos_y_modelos" / "db" / "brazil_domestic_govt_bonds" / "govt_ya_ande.v3.xlsx",
+    "GOVT_YA_PATH": REPO_ROOT / "datos_y_modelos" / "db" / "brazil_domestic_govt_bonds" / "govt_ya_ande.v6.xlsx",
     "HIST_CURVE_PATH": REPO_ROOT / "datos_y_modelos" / "db" / "one-day_interbank_deposit_futures_contract_di" / "di_curve.v6.xlsx",
     "WLA_CURVE_PATH": REPO_ROOT / "datos_y_modelos" / "db" / "id_x_ipca_spread_futures" / "hist_ipca_curve_contracts_db.xlsx",
     "SYNTHETIC_CDS_PATH": REPO_ROOT / "data" / "synthetic_cds_brl_surface.xlsx",
@@ -26,7 +26,7 @@ CONFIG = {
     "PANEL_DATA_OUTPUT_PATH": REPO_ROOT / "datos_y_modelos" / "db" / "output_panel_data" / "panel_data_with_cds.xlsx",
 
     "SOVEREIGN_REAL_CURVE": {
-    "path": REPO_ROOT / "datos_y_modelos" / "Domestic" / "domestic_sovereign_curve_brazil.v2.xlsx",
+    "path": REPO_ROOT / "datos_y_modelos" / "Domestic" / "domestic_sovereign_curve_brazil.v5.xlsx",
     "sheet_name": "db_values_only",
     "use_nss": True,
     },
