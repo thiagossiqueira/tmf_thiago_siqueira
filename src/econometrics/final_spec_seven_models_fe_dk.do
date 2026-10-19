@@ -29,7 +29,7 @@ log using ///
 *===============================================================================
 
 import excel using ///
-    "`root'\datos_y_modelos\db\econometrics_db\panel_main_and_robustness_rebuilt.xlsx", ///
+    "`root'\datos_y_modelos\db\econometrics_db\panel_main_and_robustness_rebuilt_v4.xlsx", ///
     sheet("ts") firstrow clear
 
 gen double month_id = mofd(dofc(month))
@@ -459,7 +459,7 @@ local table_options ///
               real_exchange_rate "Real USD/BRL index" ///
               real_brazil_3m_focus "Real Brazil 3M rate" ///
               gdp_yoy "GDP growth (YoY)" ///
-              debt_gdp "Gross government debt (% GDP)" ///
+              debt_gdp "Fiscal balance (% of GDP)" ///
               sovereign_spread_brl "Sovereign risk (BRL)" ///
               cf_cash_oper_to_tot_asset "Operating cash flow / total assets" ///
               tot_debt_to_ebitda "Total debt / EBITDA" ///

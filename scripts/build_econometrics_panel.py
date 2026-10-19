@@ -59,17 +59,6 @@ ECONOMETRICS_DIR = ROOT / "datos_y_modelos" / "db" / "econometrics_db"
 FUNDAMENTALS_DIR = ROOT / "datos_y_modelos" / "db" / "issuers_fundamental_data"
 MACRO_DIR = ROOT / "datos_y_modelos" / "db" / "brazil_macroeconomic_data"
 
-PUBLIC_DEBT_GDP_DIR = MACRO_DIR / "public_debt_gdp"
-
-PUBLIC_DEBT_GDP = (
-    PUBLIC_DEBT_GDP_DIR
-    / "sgs_13762_public_debt_gdp.csv"
-)
-
-PUBLIC_DEBT_GDP_README = (
-    PUBLIC_DEBT_GDP_DIR
-    / "README_SGS_13762.md"
-)
 
 DOMESTIC_DIR = ROOT / "datos_y_modelos" / "Domestic"
 GOVT_DIR = ROOT / "datos_y_modelos" / "db" / "brazil_domestic_govt_bonds"
@@ -78,7 +67,7 @@ LEGACY_PANEL = ECONOMETRICS_DIR / "panel_main_and_robustness.xlsx"
 
 # IMPORTANT:
 # Never overwrite the frozen legacy panel during development/reconciliation.
-OUTPUT_PANEL = ECONOMETRICS_DIR / "panel_main_and_robustness_rebuilt_v2.xlsx"
+OUTPUT_PANEL = ECONOMETRICS_DIR / "panel_main_and_robustness_rebuilt_v4.xlsx"
 
 BOND_METADATA = DOMESTIC_DIR / "universo_brazil_deb_des.xlsx"
 MACRO_WORKBOOK = MACRO_DIR / "macro_explanatory_variables.xlsx"
@@ -207,7 +196,6 @@ class Inputs:
     bond_metadata: Path
     macro_workbook: Path
     fed_3m_forward: Path
-    public_debt_gdp: Path
     wla_curve: Path
     govt_metadata: Path
     govt_yas: Path
@@ -234,14 +222,6 @@ def resolve_inputs() -> Inputs:
         # Audited thesis baseline U.S. short-rate control:
         # USSOC Curncy / PX_LAST at calendar month-end.
         fed_3m_forward=require_file(FED_3M_FORWARD),
-
-        # SGS 13762 replaced the incorrectly labelled EHBBBR fiscal series.
-        # Exact local filename will be locked after this inventory step.
-        public_debt_gdp=require_file(
-            MACRO_DIR
-            / "public_debt_gdp"
-            / "sgs_13762_public_debt_gdp.csv"
-        ),
 
         wla_curve=require_file(WLA_CURVE),
         govt_metadata=require_file(GOVT_METADATA),
@@ -879,6 +859,13 @@ def build_macro_controls(
           observation in the release/quarter month and zero
           placeholders in intervening months; the last valid
           quarterly observation is carried forward.
+
+      debt_gdp
+          Legacy Bloomberg EHBBBR Index / Brazil Budget Balance
+          (% GDP), seasonally adjusted and quarterly. Zero
+          placeholders in intervening months are replaced by the
+          latest valid quarterly observation. The historical field
+          name debt_gdp is retained for compatibility.
     """
 
     macro = pd.read_excel(
@@ -893,12 +880,14 @@ def build_macro_controls(
         "USDBRL Spot Exchange Rate - Price of 1 USD in BRL"
     )
     gdp_col = "Real GDP (yoy %)"
+    fiscal_col = "Budget Surplus/Deficit (% GDP)"
 
     required_columns = {
         date_col,
         vix_col,
         usd_brl_col,
         gdp_col,
+        fiscal_col,
     }
 
     missing_columns = required_columns.difference(
@@ -917,6 +906,7 @@ def build_macro_controls(
             vix_col,
             usd_brl_col,
             gdp_col,
+            fiscal_col,
         ]
     ].copy()
 
@@ -925,6 +915,7 @@ def build_macro_controls(
         "vix",
         "usd_brl",
         "gdp_raw",
+        "fiscal_raw",
     ]
 
     # First workbook row contains Bloomberg ticker labels rather
@@ -938,6 +929,7 @@ def build_macro_controls(
         "vix",
         "usd_brl",
         "gdp_raw",
+        "fiscal_raw",
     ]:
         source[column] = pd.to_numeric(
             source[column],
@@ -988,12 +980,23 @@ def build_macro_controls(
         .ffill()
     )
 
+    # Audited legacy EHBBBR convention:
+    # quarter-end Brazil Budget Balance (% GDP), seasonally adjusted,
+    # with literal zero placeholders in intervening months. Restore the
+    # historical quarterly-to-monthly carry-forward exactly.
+    source["debt_gdp"] = (
+        source["fiscal_raw"]
+        .mask(source["fiscal_raw"].eq(0))
+        .ffill()
+    )
+
     macro_monthly = source[
         [
             "month",
             "vix",
             "usd_brl",
             "gdp_yoy",
+            "debt_gdp",
         ]
     ].copy()
 
@@ -1121,6 +1124,7 @@ def build_macro_controls(
             "fed_3m_forward",
             "usd_brl",
             "gdp_yoy",
+            "debt_gdp",
         ]
     ]
 
@@ -1130,6 +1134,7 @@ def build_macro_controls(
             "fed_3m_forward",
             "usd_brl",
             "gdp_yoy",
+            "debt_gdp",
         ]
     ].isna()
 
@@ -1155,169 +1160,6 @@ def build_macro_controls(
         .reset_index(drop=True)
     )
 
-
-def build_public_debt_gdp(
-    inputs: Inputs,
-    required_months: pd.Series,
-) -> pd.DataFrame:
-    """
-    Build the baseline Brazilian public-debt control from
-    BCB/SGS series 13762:
-
-        Gross General Government Debt (% GDP)
-
-    The canonical SGS file is monthly. Under the frozen Data Freeze
-    timing convention, panel month t uses SGS reference month t-2.
-    No interpolation or carry-forward transformation is applied.
-    """
-
-    raw = pd.read_csv(
-        inputs.public_debt_gdp,
-        sep=";",
-        encoding="cp1252",
-        dtype=str,
-    )
-
-    if raw.shape[1] != 2:
-        raise AssertionError(
-            "SGS 13762 source should contain exactly two columns; "
-            f"found {raw.shape[1]}."
-        )
-
-    date_col = raw.columns[0]
-    value_col = raw.columns[1]
-
-    if "13762" not in str(value_col):
-        raise AssertionError(
-            "Public-debt source does not appear to be SGS 13762: "
-            f"{value_col}"
-        )
-
-    # SGS export includes a final source/footer row
-    # ("Fonte;BCB-DSTAT"). Keep only MM/YYYY observations.
-    monthly = raw[
-        raw[date_col]
-        .astype(str)
-        .str.fullmatch(r"\d{2}/\d{4}")
-    ].copy()
-
-    monthly["month"] = (
-        pd.to_datetime(
-            monthly[date_col],
-            format="%m/%Y",
-            errors="raise",
-        )
-        .dt.to_period("M")
-        .dt.to_timestamp("M")
-    )
-
-    monthly["debt_gdp"] = pd.to_numeric(
-        monthly[value_col]
-        .str.replace(",", ".", regex=False)
-        .str.strip(),
-        errors="raise",
-    )
-
-    monthly = (
-        monthly[
-            [
-                "month",
-                "debt_gdp",
-            ]
-        ]
-        .sort_values("month")
-        .reset_index(drop=True)
-    )
-
-    if monthly.duplicated(["month"]).any():
-        bad = monthly.loc[
-            monthly.duplicated(
-                ["month"],
-                keep=False,
-            )
-        ]
-
-        raise AssertionError(
-            "SGS 13762 contains duplicate month keys:\n"
-            f"{bad.to_string(index=False)}"
-        )
-
-    if monthly["debt_gdp"].isna().any():
-        raise AssertionError(
-            "SGS 13762 contains missing debt/GDP values."
-        )
-
-    # Validate that the SGS history itself is monthly without gaps.
-    expected_source_months = pd.date_range(
-        monthly["month"].min(),
-        monthly["month"].max(),
-        freq="ME",
-    )
-
-    missing_source_months = (
-        expected_source_months.difference(
-            pd.DatetimeIndex(monthly["month"])
-        )
-    )
-
-    if len(missing_source_months):
-        raise AssertionError(
-            "SGS 13762 contains gaps in its monthly history: "
-            f"{missing_source_months.tolist()}"
-        )
-
-    required = pd.DataFrame(
-        {
-            "month": pd.to_datetime(
-                required_months,
-                errors="raise",
-            )
-        }
-    )
-
-    required["month"] = (
-        required["month"]
-        .dt.to_period("M")
-        .dt.to_timestamp("M")
-    )
-
-    required = (
-        required
-        .drop_duplicates()
-        .sort_values("month")
-        .reset_index(drop=True)
-    )
-
-    # Frozen Data Freeze convention:
-    # use SGS 13762 with a uniform two-month reference lag.
-    #
-    # Example:
-    # panel month 2010-12-31 -> SGS reference month 2010-10-31
-    monthly_l2 = monthly.copy()
-    monthly_l2["month"] = (
-        monthly_l2["month"]
-        + pd.offsets.MonthEnd(2)
-    )
-
-    debt = required.merge(
-        monthly_l2,
-        on="month",
-        how="left",
-        validate="one_to_one",
-    )
-
-    if debt["debt_gdp"].isna().any():
-        bad = debt.loc[
-            debt["debt_gdp"].isna(),
-            ["month"],
-        ]
-
-        raise AssertionError(
-            "SGS 13762 does not cover all canonical panel months:\n"
-            f"{bad.to_string(index=False)}"
-        )
-
-    return debt
 
 
 def _load_quarterly_fundamental(
@@ -2717,7 +2559,6 @@ def assemble_rebuilt_panel(
     spine: pd.DataFrame,
     corporate_spread: pd.DataFrame,
     macro_controls: pd.DataFrame,
-    public_debt_gdp: pd.DataFrame,
     accounting_controls: pd.DataFrame,
     relative_issue_size: pd.DataFrame,
     sovereign_spread: pd.DataFrame,
@@ -2726,8 +2567,9 @@ def assemble_rebuilt_panel(
     Assemble the authoritative candidate econometrics panel from the
     frozen canonical components.
 
-    The rebuilt schema preserves the legacy 19-column structure except
-    that synthetic_cds_brl is replaced by sovereign_spread_brl.
+    The rebuilt schema preserves the 19-column structure and restores
+    legacy debt_gdp as Bloomberg EHBBBR fiscal/budget balance (% GDP),
+    while synthetic_cds_brl remains replaced by sovereign_spread_brl.
     """
 
     panel = spine[
@@ -2768,17 +2610,6 @@ def assemble_rebuilt_panel(
                 "fed_3m_forward",
                 "usd_brl",
                 "gdp_yoy",
-            ]
-        ],
-        on="month",
-        how="left",
-        validate="many_to_one",
-    )
-
-    panel = panel.merge(
-        public_debt_gdp[
-            [
-                "month",
                 "debt_gdp",
             ]
         ],
@@ -2786,6 +2617,7 @@ def assemble_rebuilt_panel(
         how="left",
         validate="many_to_one",
     )
+
 
     panel = panel.merge(
         accounting_controls[
@@ -3024,11 +2856,6 @@ def main() -> None:
         spine["month"],
     )
 
-    public_debt_gdp = build_public_debt_gdp(
-        inputs,
-        spine["month"],
-    )
-
     accounting_controls = build_accounting_controls(
         inputs,
         spine,
@@ -3048,7 +2875,6 @@ def main() -> None:
         spine,
         corporate_spread,
         macro_controls,
-        public_debt_gdp,
         accounting_controls,
         relative_issue_size,
         sovereign_spread,
@@ -3115,29 +2941,6 @@ def main() -> None:
     print(
         "  complete rows    : "
         f"{macro_controls.dropna().shape[0]:,}"
-    )
-
-    print("\nPUBLIC DEBT / GDP - SGS 13762")
-    print(f"  months           : {len(public_debt_gdp):,}")
-    print(
-        f"  first month      : "
-        f"{public_debt_gdp['month'].min().date()}"
-    )
-    print(
-        f"  last month       : "
-        f"{public_debt_gdp['month'].max().date()}"
-    )
-    print(
-        "  missing values   : "
-        f"{public_debt_gdp['debt_gdp'].isna().sum():,}"
-    )
-    print(
-        "  min debt/GDP     : "
-        f"{public_debt_gdp['debt_gdp'].min():.2f}"
-    )
-    print(
-        "  max debt/GDP     : "
-        f"{public_debt_gdp['debt_gdp'].max():.2f}"
     )
 
     accounting_pairs = (

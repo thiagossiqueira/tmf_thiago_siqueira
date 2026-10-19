@@ -32,7 +32,7 @@ log using ///
 *===============================================================================
 
 import excel using ///
-    "`root'\datos_y_modelos\db\econometrics_db\panel_main_and_robustness_rebuilt.xlsx", ///
+    "`root'\datos_y_modelos\db\econometrics_db\panel_main_and_robustness_rebuilt_v4.xlsx", ///
     sheet("ts") firstrow clear
 
 gen double month_id = mofd(dofc(month))
