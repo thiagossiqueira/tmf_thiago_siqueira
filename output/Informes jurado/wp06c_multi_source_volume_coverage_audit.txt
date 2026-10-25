@@ -1,0 +1,95 @@
+﻿TFM WP-06C - Multi-Source Bond Volume Coverage Audit
+
+OBJECTIVE
+Assess whether alternative Bloomberg pricing sources can extend the
+historical coverage of the WP-06B bond-liquidity measure beyond the
+B3CT usable window.
+
+BASELINE PRESERVED
+WP-06B Candidate v1 remains unchanged.
+Source: Bloomberg PX_VOLUME
+pricing_source = B3CT
+fill = NA
+verified_trade_day = 1 iff PX_VOLUME > 0
+eligible day = cdr_anbima business day within [ISSUE_DT, MATURITY)
+bond_trading_day_share =
+    verified_trading_days / eligible_trading_days
+Frozen usable window = Sep-2023 to Jun-2025.
+
+SOURCE UNIVERSE
+26 pricing sources from pcs_debentures.xlsx:
+ANBE, ANDE, ATIV, B3CT, B3CY, BDBR, BGN, BINT, BRAD, BSFE,
+BVAL, CMDB, FX1L, GDEO, ICOR, JGPA, LCPR, MIAE, NECT, NUIN,
+OPEA, PSAN, TPBZ, TRUS, VRTX, XPCP.
+
+SCREEN RESULT
+Only three sources returned positive PX_VOLUME:
+B3CT : 25,347 positive bond-days; 91 bonds; first 2019-09-13.
+B3CY : 19,969 positive bond-days; 87 bonds; first 2023-08-10.
+FX1L :    333 positive bond-days;  9 bonds; first 2014-07-21.
+
+MATCHED PRICE-SOURCE TEST
+ANDE, ATIV, BRAD, CMDB and PSAN returned no positive PX_VOLUME
+for the thesis bonds.
+
+B3CY VS B3CT
+For the B3CY-covered bonds, every B3CY positive trade-day was also
+positive in B3CT.
+Incremental B3CY binary trade-days = 0.
+Therefore B3CY does not extend liquidity coverage.
+
+FX1L VS B3CT
+FX1L positive trade-days = 333.
+Also positive in B3CT = 7.
+FX1L-only incremental trade-days = 326.
+Bonds with incremental FX1L observations = 9.
+Incremental date range = 2014-07-21 to 2022-09-15.
+
+All 326 incremental FX1L observations fall within
+[ISSUE_DT, MATURITY):
+before ISSUE_DT = 0
+on/after MATURITY = 0.
+
+CROSS-SECTIONAL COVERAGE GATE
+Using the number of bonds present in the thesis panel each month:
+
+Pre-Sep-2023 combined B3CT+FX1L coverage:
+median = 10.0%
+mean   = 13.2%
+
+Months with coverage >= 10%: 77
+Months with coverage >= 20%: 50
+Months with coverage >= 25%: 42
+Months with coverage >= 30%: 14
+Months with coverage >= 40%: 1
+Months with coverage >= 50%: 1
+Months with coverage >= 75%: 1
+Months with coverage >= 90%: 1
+
+The sole month above 40% is Aug-2023:
+38 / 42 panel bonds = 90.5%.
+
+Aug-2023 remains rejected because the B3CT structural feed expansion
+occurred during the month (10-11 Aug 2023). The first complete usable
+month remains Sep-2023.
+
+Pre-expansion examples:
+Sep-2019: 9 / 25 bonds = 36.0%.
+Oct-2019: 9 / 24 bonds = 37.5%.
+
+CONCLUSION
+FX1L provides genuine additional historical evidence of trading activity
+for 9 thesis bonds and adds 326 binary trade-days not observed in B3CT.
+
+However, this historical coverage is too sparse and cross-sectionally
+unstable to support extending the econometrically usable liquidity window.
+
+No multi-source Candidate v2 is adopted.
+
+FINAL LIQUIDITY DECISION
+Retain WP-06B Candidate v1 unchanged:
+pricing source = B3CT
+usable window = Sep-2023 to Jun-2025.
+
+FX1L is retained only as documented supplementary historical evidence,
+not as part of the final bond_trading_day_share variable.
