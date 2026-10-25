@@ -1,0 +1,284 @@
+TFM WP-06D - SND Historical Bond-Market Liquidity Candidate v1
+
+STATUS
+Candidate constructed and validation gates passed.
+WP-06D artifacts prepared for repository freeze.
+
+OBJECTIVE
+Extend the bond-market liquidity measure requested in WP-06B beyond the
+limited Bloomberg B3CT historical window, while preserving exactly the
+same economic definition and denominator.
+
+SOURCE
+Legacy SND / debentures.com.br secondary-market transaction records
+("Precos de Negociacao"), queried by CETIP/SND asset code.
+
+The Bloomberg-to-SND identifier bridge uses ID_STOCK_EXCHANGE for all
+103 thesis bonds.
+
+RAW COLLECTION
+Query window = 2010-01-01 through 2025-12-31.
+Collected bonds = 103.
+Bonds with >=1 SND trade record = 103.
+Raw unique bond-trade-days = 59,322.
+
+The thesis candidate is truncated to the frozen panel endpoint,
+2025-06-30. Jul-Dec 2025 records do not enter the thesis liquidity
+candidate.
+
+LIQUIDITY DEFINITION
+verified_trade_day = 1 iff SND reports a secondary-market transaction
+for the bond on that date.
+
+eligible day = cdr_anbima business day within [ISSUE_DT, MATURITY).
+
+bond_trading_day_share_snd =
+    verified_trading_days_snd / eligible_trading_days_snd
+
+This reproduces the denominator definition used in frozen WP-06B.
+
+NO-TRADE CONVENTION
+For an eligible bond-month with no SND transaction:
+    verified_trading_days_snd = 0
+    bond_trading_day_share_snd = 0
+    total_reported_quantity_snd = missing
+    total_reported_trades_snd = missing
+
+Thus, an observed absence of trading is treated as zero liquidity rather
+than missing data.
+
+WP-06B REPRODUCTION GATE
+The frozen Bloomberg B3CT WP-06B methodology was independently rebuilt
+before applying it to SND.
+
+Frozen B3CT usable sample:
+    rows = 1,344
+    bonds = 87
+    first month = 2023-09
+    last month = 2025-06
+
+Reproduction results:
+    eligible-day mismatches = 0
+    verified-day mismatches = 0
+    maximum absolute B3CT volume difference = 0
+    maximum absolute liquidity-share difference =
+        1.1102230246251565e-16
+    zero-share months = 82
+    mean share = 0.713642
+    median share = 0.904762
+    min = 0
+    max = 1
+
+The apparent initial reproduction failure was solely the frozen
+convention that reported B3CT volume remains missing in the 82
+zero-trade months. After preserving that convention:
+    verified days exact = True
+    volume exact = True
+    zero-trade volume missing = 82
+
+FINAL WP-06B REPRODUCTION GATE = PASS.
+
+SND DAILY INTEGRITY
+Raw SND rows = 59,322.
+Bonds = 103.
+Unique bond-dates = 59,322.
+Duplicate bond-dates = 0.
+
+All 59,322 SND transaction dates are cdr_anbima business days.
+Non-ANBIMA business-day records = 0.
+Weekend records = 0.
+
+Prior lifecycle / identifier audit:
+    records before ISSUE_DT = 0
+    records on/after MATURITY = 0
+    asset-code mismatches = 0
+    ISIN mismatches = 0
+
+SND DAILY INTEGRITY GATE = PASS.
+
+THESIS-PANEL CANDIDATE
+Output rows = 4,648.
+Bonds = 103.
+First panel month = 2010-12.
+Last panel month = 2025-06.
+
+Bond-months with >=1 verified SND trade day = 4,123.
+Zero-share bond-months = 525.
+
+Distribution:
+    mean = 0.530904
+    median = 0.526316
+    min = 0
+    max = 1
+
+Eligible trading days:
+    minimum = 2
+    maximum = 23
+
+Unlike Bloomberg B3CT Candidate v1, the SND variable can be constructed
+for all 4,648 observations in the frozen thesis panel.
+
+B3CT OVERLAP VALIDATION
+Common B3CT-usable sample:
+    rows = 1,344
+    bonds = 87
+    period = 2023-09 through 2025-06
+
+Monthly denominator:
+    eligible-day mismatches SND vs B3CT = 0
+
+Monthly liquidity:
+    B3CT mean = 0.713642
+    SND mean = 0.717585
+    B3CT median = 0.904762
+    SND median = 0.904762
+    Pearson correlation = 0.987597
+    mean(SND - B3CT) = 0.003943
+
+Monthly comparisons:
+    SND > B3CT = 103
+    exactly equal = 1,085
+    SND < B3CT = 156
+
+Daily overlap on 27,748 eligible bond-days:
+    B3CT positive = 19,861
+    SND positive = 19,959
+    both positive = 19,650
+    SND only = 309
+    B3CT only = 211
+    neither = 7,578
+
+Trade-positive Jaccard similarity = 0.974219.
+Binary agreement across eligible bond-days = 0.981260.
+
+Cross-check identities:
+    19,650 + 211 = 19,861 B3CT positive days
+    19,650 + 309 = 19,959 SND positive days
+
+Daily-to-monthly rebuild mismatches:
+    B3CT eligible = 0
+    B3CT verified = 0
+    SND verified = 0
+
+Interpretation:
+The overlap strongly supports SND and B3CT as measures of the same
+underlying concept -- whether a bond traded on an eligible business day
+-- rather than materially different liquidity constructs.
+
+TEMPORAL COVERAGE
+Annual share of panel bond-months with >=1 SND trade:
+
+    2010   0.0%   (1 observation only)
+    2011  56.5%
+    2012  81.4%
+    2013  82.0%
+    2014  84.0%
+    2015  81.0%
+    2016  81.1%
+    2017  83.6%
+    2018  84.1%
+    2019  90.3%
+    2020  89.4%
+    2021  89.0%
+    2022  91.5%
+    2023  94.6%
+    2024  93.7%
+    2025  94.4%
+
+Across 175 panel months:
+    mean positive breadth = 84.19%
+    median positive breadth = 87.50%
+
+No source-wide structural expansion comparable to the Bloomberg B3CT
+August-2023 feed break was identified.
+
+OCTOBER-2015 CHECK
+October 2015 was investigated because positive cross-sectional breadth
+fell from 91.3% in September to 62.5% in October, recovering to 83.3%
+in November.
+
+Raw activity:
+    Sep-2015: 123 bond-trade-days, 22 bonds, 21 calendar dates
+    Oct-2015: 126 bond-trade-days, 15 bonds, 21 calendar dates
+    Nov-2015:  97 bond-trade-days, 20 bonds, 19 calendar dates
+
+October records run continuously from 2015-10-01 through 2015-10-30,
+with transactions reported throughout the month.
+
+Therefore the October-2015 breadth decline is not treated as a source
+outage. It represents cross-sectional variation in observed trading
+participation.
+
+TEMPORAL COVERAGE GATE = PASS.
+
+SOURCE-SCOPE CAVEAT
+The legacy SND/CETIP transaction records represent registered
+secondary-market activity and are not restricted to REUNE extragroup
+transactions.
+
+Published Brazilian market research notes that CETIP transaction data
+may contain both intragroup and extragroup operations, whereas REUNE
+can be filtered to extragroup activity. Accordingly, the WP-06D
+variable should be interpreted as the share of eligible business days
+on which registered secondary-market trading activity was observed,
+not specifically as the share of days with arm's-length extragroup
+trading.
+
+This distinction is particularly important for volume- or turnover-based
+liquidity measures. WP-06D deliberately uses only a binary trading-day
+indicator and does not interpret reported quantity or number of trades
+as an econometric liquidity variable.
+
+Scope references:
+- BNDES, Revista do BNDES 44, discussion of secondary-market debenture
+  liquidity using ANBIMA/CETIP/CVM data and the distinction between
+  CETIP and REUNE transaction scopes.
+- ANBIMA, REUNE methodology / FAQ, distinction between total and
+  extragroup secondary-market transactions.
+
+GOVERNANCE
+Frozen panel v4 was NOT overwritten.
+Frozen WP-06B B3CT Candidate v1 was NOT overwritten.
+Frozen WP-06C multi-source Bloomberg conclusions were NOT overwritten.
+Frozen WP-08 outputs were NOT overwritten.
+
+The SND candidate is maintained as a separate WP-06D artifact pending
+econometric comparison and final model-integration decision.
+
+FILES AND SHA256
+
+Raw SND trade file:
+datos_y_modelos/db/brazil_domestic_corp_bonds/snd_secondary_market/snd_103_bonds_trades_raw.csv
+SHA256 =
+899445EFE1774E3CC6C4E1DBB7AFA17E5935904EBB1DF8449061DB080C882BA4
+
+Bloomberg/SND crosswalk:
+datos_y_modelos/db/brazil_domestic_corp_bonds/wp06c_103_bonds_exchange_id_crosswalk.csv
+SHA256 =
+2B173C8D87CC798F0000EAC7EE6E74AAAE58BEB1731A27A1083FA45725EE2D4F
+
+Collection script:
+scripts/collect_snd_secondary_market.py
+SHA256 =
+40E4FA982F1C1B84854192736171B594C4D32A64802722BD3E09049FB58A627E
+
+Candidate builder:
+scripts/build_snd_bond_liquidity_candidate.py
+SHA256 =
+9EE872E68380883EFE120B3D5590ECC8B2ACFB87D606E0358EEA182D275A2D52
+
+SND Candidate v1:
+datos_y_modelos/db/econometrics_db/wp06d_bond_liquidity_snd_candidate_v1.csv
+SHA256 =
+E73F16F2EAD1D1180CC157B5B044E478C313DBA1AF90B7BBF6A7D1ADEA9412B5
+
+CURRENT WP-06D CONCLUSION
+SND provides a historically much broader transaction-based measure of
+bond-market liquidity while preserving the exact WP-06B trading-day
+share definition.
+
+Its very high agreement with B3CT during the common Sep-2023-Jun-2025
+window supports its use as the historical liquidity candidate for the
+next controlled econometric comparison.
+
+No econometric baseline has yet been replaced by WP-06D.
