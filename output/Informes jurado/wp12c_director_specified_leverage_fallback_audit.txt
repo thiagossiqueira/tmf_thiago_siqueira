@@ -1,0 +1,284 @@
+TFM - WP-12C DIRECTOR-SPECIFIED LEVERAGE FALLBACK AUDIT
+=============================================================
+
+PURPOSE
+-------
+Implement and audit the leverage hierarchy explicitly requested by thesis
+director Martin Grandes on 22-Oct-2026:
+
+1. Preferred concept:
+   Market-value debt / market capitalization.
+
+2. If unavailable:
+   Total Debt / Total Assets from balance sheets as the explicit second-best
+   fallback.
+
+No third proxy is introduced and no specification choice is based on
+coefficient sign or statistical significance.
+
+
+FROZEN ECONOMETRIC ARCHITECTURE
+-------------------------------
+Dependent variable:
+- Geometric corporate spread.
+
+Estimator:
+- Bond fixed effects.
+- Driscoll-Kraay standard errors.
+- Maximum DK lag = 4.
+
+Final table:
+- M1-M8 architecture preserved.
+- Bond Trading Days excluded from preferred main table.
+- Operating Cash Flow / Assets included only in M8.
+- Total Debt / EBITDA excluded.
+- No Amount Issued / Assets.
+- Sovereign risk remains the BRL sovereign spread.
+
+Frozen panel:
+- 4,648 bond-month observations.
+- 103 bonds.
+- 48 issuers.
+- 2010m12-2025m6.
+
+
+DIRECTOR'S PREFERRED MEASURE: MARKET-VALUE DEBT / MARKET CAP
+------------------------------------------------------------
+The exact preferred measure could not be implemented defensibly from the
+available dataset.
+
+The existing WP-12A measure is:
+
+    Book Total Debt / Equity Market Capitalization
+
+This is NOT market-value debt / market capitalization.
+
+It combines a book-value numerator with a market-value denominator and is
+therefore retained only as a leverage robustness specification.
+
+WP-12A coverage:
+- 3,303 observations.
+- 93 bonds.
+- 44 issuers.
+- 2011m3-2025m6.
+- Approximately 71.1% of the frozen panel.
+
+The reduced coverage reflects the requirement for an observable equity market
+capitalization and therefore excludes observations associated with issuers
+without usable market-cap data. Using WP-12A as the main leverage measure
+would consequently change the estimation sample and introduce an avoidable
+listed-firm / market-cap availability selection channel.
+
+
+DIRECTOR-SPECIFIED FALLBACK: TOTAL DEBT / TOTAL ASSETS
+------------------------------------------------------
+Main Bloomberg field:
+
+    TOT_DEBT_TO_TOT_ASSET
+
+Units:
+- Percent of total assets.
+
+Bloomberg query convention:
+- Parent equity ticker.
+- Quarterly fundamental period.
+- Point-in-time accounting quarter inherited from the frozen accounting
+  selection logic.
+
+Coverage on the frozen thesis panel:
+- 4,648 / 4,648 observations.
+- 100.0% coverage.
+- 103 bonds.
+- 48 issuers.
+- 2010m12-2025m6.
+
+Observed distribution on the full panel:
+- Minimum: 2.0881808938
+- Median: 34.0857885715
+- Maximum: 79.5369688733
+
+
+LINEAGE CROSS-CHECK
+-------------------
+The direct Bloomberg field was independently compared against:
+
+    100 * SHORT_AND_LONG_TERM_DEBT / BS_TOT_ASSET
+
+using the same frozen point-in-time accounting quarter.
+
+On all 4,648 thesis observations:
+- Direct field nonmissing: 4,648.
+- Constructed comparator nonmissing: 4,648.
+- Absolute difference <= 0.01 percentage points: 4,648 / 4,648.
+- Observations with difference > 0.01 pp: 0.
+- Maximum absolute difference: 0.0004333262 pp.
+
+Conclusion:
+- Bloomberg TOT_DEBT_TO_TOT_ASSET is accepted as the main implementation.
+- The reconstructed ratio is retained only as a lineage validation.
+
+
+FINAL WP-12C M1-M8 SAMPLE
+-------------------------
+All natural model samples M1-M8 retain:
+- 4,648 observations.
+- 103 bonds.
+- 48 issuers.
+- 2010m12-2025m6.
+
+M4 and M8 sample-membership difference:
+- 0 observations.
+
+Therefore the strict common final-table sample is the complete frozen panel.
+
+
+FINAL WP-12C LEVERAGE RESULTS
+-----------------------------
+FE bond + Driscoll-Kraay lag(4), full 4,648-observation sample:
+
+M4:
+- Total Debt / Total Assets = -3.3342
+- DK SE = 1.0051
+- p = 0.001
+
+M5:
+- Total Debt / Total Assets = -3.3077
+- DK SE = 1.0101
+- p = 0.001
+
+M6:
+- Total Debt / Total Assets = -3.5847
+- DK SE = 1.0341
+- p = 0.001
+
+M8:
+- Total Debt / Total Assets = -3.3939
+- DK SE = 1.0033
+- p = 0.001
+
+The sign is negative in the full-panel specification. This result is reported
+as estimated; the leverage measure was not selected because of this sign or
+its statistical significance.
+
+
+CONTROLLED WP-12A VS WP-12C LEVERAGE-PROXY BRIDGE
+--------------------------------------------------
+To separate the effect of the leverage definition from the effect of the
+estimation sample, M4, M5, M6 and M8 were re-estimated on the exact same
+WP-12A sample:
+
+- 3,303 observations.
+- 93 bonds.
+- 44 issuers.
+- 2011m3-2025m6.
+- Bond FE.
+- Driscoll-Kraay lag(4).
+
+Within each model pair, every regressor and observation is identical.
+Only the leverage proxy changes.
+
+Controlled Total Debt / Total Assets results:
+
+M4:
+- coefficient = +1.6634
+- DK SE = 1.0103
+- p = 0.102
+
+M5:
+- coefficient = +1.3658
+- DK SE = 1.0228
+- p = 0.184
+
+M6:
+- coefficient = +0.3463
+- DK SE = 1.0883
+- p = 0.751
+
+M8:
+- coefficient = +1.6759
+- DK SE = 1.0097
+- p = 0.099
+
+Therefore the negative coefficient observed in the final 4,648-observation
+WP-12C table is NOT mechanically generated by replacing Book Debt / Market
+Cap with Total Debt / Total Assets.
+
+Holding the sample fixed at 3,303 observations, Total Debt / Total Assets is
+positive in all four specifications.
+
+The sign reversal occurs when the Total Debt / Total Assets measure permits
+the estimation sample to expand from 3,303 to the full 4,648 observations.
+
+Interpretation:
+- This is a sample-composition / coverage sensitivity.
+- It must not be interpreted as evidence for selecting one proxy based on
+  coefficient sign.
+- The final proxy choice remains governed by the director's stated hierarchy
+  and data defensibility.
+
+
+RELATION BETWEEN THE TWO LEVERAGE PROXIES
+-----------------------------------------
+On the identical 3,303-observation controlled sample:
+
+Book Debt / Equity Market Cap:
+- Mean = 0.8315243
+- SD = 0.6787127
+- Min = 0.0580501
+- Max = 9.549443
+
+Total Debt / Total Assets:
+- Mean = 36.17349
+- SD = 14.10556
+- Min = 2.088181
+- Max = 79.53697
+
+Contemporaneous correlation:
+- rho = 0.3046
+- p = 0.0000
+- N = 3,303
+
+The two measures are positively related but only moderately correlated.
+They therefore capture related but materially different leverage concepts,
+and their coefficient magnitudes should not be compared directly because
+their economic definitions and scales differ.
+
+
+DECISION
+--------
+PASS - Adopt Total Debt / Total Assets as the main leverage proxy.
+
+Reasons:
+1. It is the explicit second-best measure specified by the director when
+   market-value debt / market cap is unavailable.
+2. The exact preferred market-value debt numerator is not available
+   defensibly in the frozen dataset.
+3. Bloomberg TOT_DEBT_TO_TOT_ASSET provides 100% coverage of the frozen panel.
+4. The direct Bloomberg field is independently validated against the
+   reconstructed balance-sheet ratio.
+5. It preserves the complete 4,648-observation thesis panel.
+6. The choice is made ex ante from the director's hierarchy and data quality,
+   not from coefficient sign or statistical significance.
+
+Book Total Debt / Equity Market Cap remains in the robustness annex (WP-12A)
+because:
+- it is a useful market-denominator leverage robustness measure;
+- it is NOT the requested market-value debt / market-cap concept;
+- it has materially lower coverage;
+- adopting it as baseline would impose a market-cap availability selection.
+
+DEFENSE TAKEAWAY
+----------------
+If questioned during the defense:
+
+- The director first requested market-value debt / market capitalization.
+- The available market-cap implementation uses BOOK debt in the numerator,
+  so it is not the requested concept and is retained transparently as a
+  robustness exercise.
+- The director explicitly specified Total Debt / Total Assets as the fallback.
+- Bloomberg provides that measure directly with 100% panel coverage, and it
+  reproduces the independently reconstructed balance-sheet ratio almost
+  exactly.
+- A controlled common-sample exercise shows that the different leverage
+  results are sensitive to sample composition; therefore no proxy was chosen
+  because it produced a preferred coefficient sign.

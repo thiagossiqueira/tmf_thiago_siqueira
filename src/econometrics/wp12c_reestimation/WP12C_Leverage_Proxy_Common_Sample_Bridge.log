@@ -1,0 +1,1448 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\econom
+> etrics\wp12c_reestimation\WP12C_Leverage_Proxy_Common_Sample_Bridge.log
+  log type:  text
+ opened on:  26 Oct 2026, 21:39:38
+
+. 
+. *============================================================================
+> ===
+. * 1. LOAD FROZEN WP-06 PANEL
+. *============================================================================
+> ===
+. 
+. import excel using ///
+>     "`root'\datos_y_modelos\db\econometrics_db\panel_main_and_robustness_rebu
+> ilt_v4.xlsx", ///
+>     sheet("ts") firstrow clear
+
+. 
+. gen double month_id = mofd(dofc(month))
+
+. format month_id %tm
+
+. 
+. count if missing(month_id)
+  0
+
+. if r(N)>0 {
+.     di as error "month_id could not be constructed for all frozen-panel rows.
+> "
+.     exit 198
+. }
+
+. 
+. tempfile frozen_panel
+
+. save `frozen_panel'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_4850_000001.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 2. LOAD CPI LEVEL INPUTS FOR BILATERAL RER
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\datos_y_modelos\db\real_exchange_rate_inputs\rer_cpi_monthly_inpu
+> ts.csv", ///
+>     varnames(1) clear
+(5 vars, 175 obs)
+
+. 
+. gen double cpi_date = date(month, "YMD")
+
+. gen double month_id = mofd(cpi_date)
+
+. format month_id %tm
+
+. 
+. isid month_id
+
+. 
+. keep month_id cpi_us_index cpi_br_index us_series_id br_series_id
+
+. 
+. tempfile rer_inputs
+
+. save `rer_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_4850_000002.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 3. LOAD VALIDATED REAL FED 3M INPUT
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\datos_y_modelos\db\brazil_macroeconomic_data\real_fed_3m\real_fed
+> _3m_spf_monthly.csv", ///
+>     varnames(1) clear
+(10 vars, 175 obs)
+
+. 
+. gen double real_fed_date = date(month_end, "YMD")
+
+. gen double month_id = mofd(real_fed_date)
+
+. format month_id %tm
+
+. 
+. isid month_id
+
+. 
+. keep month_id ///
+>     ussoc_px_last ///
+>     spf_cpi_next_quarter ///
+>     real_fed_3m_spf ///
+>     real_fed_3m_spf_exact
+
+. 
+. tempfile real_fed_inputs
+
+. save `real_fed_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_4850_000003.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 4. LOAD VALIDATED REAL BRAZIL 3M INPUT
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\datos_y_modelos\db\brazil_macroeconomic_data\real_brazil_3m\real_
+> brazil_3m_focus_panel_dates.csv", ///
+>     varnames(1) clear
+(26 vars, 175 obs)
+
+. 
+. gen double real_brazil_date = date(obs_date, "YMD")
+
+. gen double month_id = mofd(real_brazil_date)
+
+. format month_id %tm
+
+. 
+. isid month_id
+
+. 
+. count if missing(real_brazil_3m_focus)
+  0
+
+. if r(N)>0 {
+.     di as error "Missing primary Real Brazil 3M values."
+.     exit 459
+. }
+
+. 
+. count if abs(nominal_di_canonical_diff_bp) > 1e-9 ///
+>     & !missing(nominal_di_canonical_diff_bp)
+  0
+
+. if r(N)>0 {
+.     di as error "Real Brazil input fails canonical DI reconciliation."
+.     exit 459
+. }
+
+. 
+. keep month_id ///
+>     nominal_brazil_3m_di_pct ///
+>     expected_ipca_ann_pct ///
+>     real_brazil_3m_focus ///
+>     real_brazil_3m_focus_exact ///
+>     nominal_di_canonical_diff_bp
+
+. 
+. tempfile real_brazil_inputs
+
+. save `real_brazil_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_4850_000004.tmp saved
+
+. *============================================================================
+> ===
+. * 5A. LOAD WP-12A BOOK DEBT / MARKET CAP
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\output\Informes jurado\WP12_same_entity_book_debt_to_mktcap_4648_
+> brl_only.csv", ///
+>     varnames(1) clear
+(23 vars, 4,648 obs)
+
+. 
+. gen double leverage_date = date(obs_date, "YMD")
+
+. gen double month_id = mofd(leverage_date)
+
+. format month_id %tm
+
+. 
+. count if missing(month_id)
+  0
+
+. if r(N)>0 {
+.     di as error "Could not construct Book Debt / Market Cap month_id."
+.     exit 459
+. }
+
+. 
+. isid bond_id month_id
+
+. keep bond_id month_id book_debt_to_market_cap
+
+. 
+. count if !missing(book_debt_to_market_cap)
+  3,303
+
+. if r(N) != 3303 {
+.     di as error "Expected 3,303 nonmissing Book Debt / Market Cap observation
+> s."
+.     exit 459
+. }
+
+. 
+. tempfile book_leverage_inputs
+
+. save `book_leverage_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_4850_000005.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 5B. LOAD WP-12C TOTAL DEBT / TOTAL ASSETS
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\output\Informes jurado\WP12C_total_debt_to_total_assets_4648.csv"
+> , ///
+>     varnames(1) clear
+(13 vars, 4,648 obs)
+
+. 
+. gen double leverage_date = date(obs_date, "YMD")
+
+. gen double month_id = mofd(leverage_date)
+
+. format month_id %tm
+
+. 
+. count if missing(month_id)
+  0
+
+. if r(N)>0 {
+.     di as error "Could not construct Total Debt / Total Assets month_id."
+.     exit 459
+. }
+
+. 
+. isid bond_id month_id
+
+. keep bond_id month_id total_debt_to_total_assets
+
+. 
+. count if !missing(total_debt_to_total_assets)
+  4,648
+
+. if r(N) != 4648 {
+.     di as error "Expected 4,648 nonmissing Total Debt / Total Assets observat
+> ions."
+.     exit 459
+. }
+
+. 
+. tempfile tda_leverage_inputs
+
+. save `tda_leverage_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_4850_000006.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 5. RESTORE FROZEN PANEL AND MERGE RER INPUTS
+. *============================================================================
+> ===
+. 
+. use `frozen_panel', clear
+
+. 
+. merge m:1 month_id using `rer_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error "CPI/RER merge did not match all frozen-panel observations."
+.     tab _merge
+.     exit 459
+. }
+
+. drop _merge
+
+. 
+. count if missing(cpi_us_index, cpi_br_index)
+  0
+
+. if r(N)>0 {
+.     di as error "Missing CPI inputs after RER merge."
+.     exit 459
+. }
+
+. 
+. * Bilateral real USD/BRL:
+. * RER_t = USD/BRL_t * CPI_US_t / CPI_BR_t
+. * Increase = BRL real depreciation.
+. 
+. gen double rer_usd_brl = ///
+>     usd_brl * cpi_us_index / cpi_br_index
+
+. 
+. quietly summarize rer_usd_brl if month_id == tm(2010m12), meanonly
+
+. local base_rer = r(mean)
+
+. 
+. if missing(`base_rer') {
+.     di as error "December 2010 RER base value is missing."
+.     exit 459
+. }
+
+. 
+. gen double real_exchange_rate = ///
+>     100 * rer_usd_brl / `base_rer'
+
+. 
+. label variable real_exchange_rate ///
+>     "Real USD/BRL index; increase = BRL real depreciation"
+
+. 
+. *============================================================================
+> ===
+. * 6. MERGE REAL FED 3M
+. *============================================================================
+> ===
+. 
+. merge m:1 month_id using `real_fed_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error "Real-Fed input does not match all frozen-panel observations.
+> "
+.     tab _merge
+.     exit 459
+. }
+
+. 
+. * Validated Real-Fed SPF coverage now spans the full frozen-panel window,
+. * 2010m12-2025m6, with no missing month-end observations.
+. 
+. gen double fed_nominal_diff = ///
+>     abs(fed_3m_forward - ussoc_px_last) if _merge == 3
+
+. 
+. quietly summarize fed_nominal_diff, meanonly
+
+. di as result ///
+>     "MAX |frozen-panel Fed - Real-Fed nominal input|: " %12.10f r(max)
+MAX |frozen-panel Fed - Real-Fed nominal input|: 0.0000002274
+
+. 
+. count if fed_nominal_diff > 1e-6 & !missing(fed_nominal_diff)
+  0
+
+. if r(N)>0 {
+.     di as error ///
+>         "Real-Fed nominal leg does not reproduce frozen-panel fed_3m_forward.
+> "
+.     exit 459
+. }
+
+. 
+. drop _merge fed_nominal_diff
+
+. 
+. label variable real_fed_3m_spf ///
+>     "Real US 3M OIS: USSOC minus SPF expected next-quarter CPI"
+
+. 
+. *============================================================================
+> ===
+. * 7. MERGE REAL BRAZIL 3M
+. *============================================================================
+> ===
+. 
+. merge m:1 month_id using `real_brazil_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error ///
+>         "Real Brazil 3M input did not match all frozen-panel months."
+.     tab _merge
+.     exit 459
+. }
+
+. drop _merge
+
+. 
+. quietly summarize nominal_di_canonical_diff_bp, meanonly
+
+. di as result ///
+>     "MAX |Brazil nominal DI - canonical DI| (bp): " %12.10f r(max)
+MAX |Brazil nominal DI - canonical DI| (bp): 0.0000000000
+
+. 
+. label variable real_brazil_3m_focus ///
+>     "Real Brazil 3M DI: nominal DI minus Focus expected IPCA"
+
+. 
+. *============================================================================
+> ===
+. * 7A. MERGE BOTH LEVERAGE PROXIES
+. *============================================================================
+> ===
+. 
+. merge 1:1 bond_id month_id using `book_leverage_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error "Book Debt / Market Cap input did not match all panel keys."
+.     tab _merge
+.     exit 459
+. }
+
+. drop _merge
+
+. 
+. count if !missing(book_debt_to_market_cap)
+  3,303
+
+. if r(N) != 3303 {
+.     di as error "Expected 3,303 Book Debt / Market Cap observations after mer
+> ge."
+.     exit 459
+. }
+
+. 
+. merge 1:1 bond_id month_id using `tda_leverage_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error "Total Debt / Total Assets input did not match all panel keys
+> ."
+.     tab _merge
+.     exit 459
+. }
+
+. drop _merge
+
+. 
+. count if !missing(total_debt_to_total_assets)
+  4,648
+
+. if r(N) != 4648 {
+.     di as error "Expected 4,648 Total Debt / Total Assets observations after 
+> merge."
+.     exit 459
+. }
+
+. 
+. label variable book_debt_to_market_cap ///
+>     "Book debt / equity market cap"
+
+. 
+. label variable total_debt_to_total_assets ///
+>     "Total debt / total assets (%)"
+
+. 
+. *============================================================================
+> ===
+. * 8. CONTROLLED LEVERAGE-PROXY SPECIFICATIONS
+. *
+. * Objective:
+. * Hold the WP-12A sample fixed and change ONLY the leverage proxy.
+. *
+. * A = Book Total Debt / Equity Market Cap
+. * B = Total Debt / Total Assets
+. *
+. * FE bond + Driscoll-Kraay lag(4) in every regression.
+. *============================================================================
+> ===
+. 
+. local book4_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     book_debt_to_market_cap ///
+>     days_to_maturity
+
+. 
+. local tda4_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     total_debt_to_total_assets ///
+>     days_to_maturity
+
+. 
+. local book5_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     book_debt_to_market_cap ///
+>     days_to_maturity
+
+. 
+. local tda5_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     total_debt_to_total_assets ///
+>     days_to_maturity
+
+. 
+. local book6_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     book_debt_to_market_cap ///
+>     days_to_maturity
+
+. 
+. local tda6_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     total_debt_to_total_assets ///
+>     days_to_maturity
+
+. 
+. local book8_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     book_debt_to_market_cap ///
+>     cf_cash_oper_to_tot_asset ///
+>     days_to_maturity
+
+. 
+. local tda8_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     total_debt_to_total_assets ///
+>     cf_cash_oper_to_tot_asset ///
+>     days_to_maturity
+
+. 
+. *============================================================================
+> ===
+. * 9. CONTROLLED SAMPLE
+. *============================================================================
+> ===
+. 
+. gen byte sample_wp12a = 1
+
+. markout sample_wp12a spread `book8_x'
+
+. 
+. gen byte sample_tda = 1
+
+. markout sample_tda spread `tda8_x'
+
+. 
+. count if sample_wp12a
+  3,303
+
+. local n_wp12a = r(N)
+
+. 
+. count if sample_tda
+  4,648
+
+. local n_tda = r(N)
+
+. 
+. gen byte sample_common = sample_wp12a & sample_tda
+
+. 
+. count if sample_common
+  3,303
+
+. local ncommon = r(N)
+
+. 
+. count if sample_common != sample_wp12a
+  0
+
+. if r(N)>0 {
+.     di as error "Controlled sample differs from the frozen WP-12A sample."
+.     exit 459
+. }
+
+. 
+. quietly summarize month_id if sample_common, meanonly
+
+. local common_first = r(min)
+
+. local common_last  = r(max)
+
+. 
+. levelsof bond_id if sample_common, local(common_bonds)
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS195336 Corp"'
+>  `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW472288 Corp"' `"BW
+> 472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW498002 Corp"' `"BX22558
+> 8 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Corp"' `"EI050425 Cor
+> p"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI648119 Corp"' `"EJ087310 Corp"' `
+> "EJ088074 Corp"' `"EJ383826 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK05
+> 5372 Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK070894 Corp"' `"EK571905 
+> Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ624782 Corp"' `"UV462972 Corp"
+> ' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Corp"' `"YQ206351 Corp"' `"Y
+> Q208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' `"YS128174 Corp"' `"YS2282
+> 96 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT761883 Corp"' `"YU283312 Co
+> rp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769 Corp"' `"YU835365 Corp"' 
+> `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp"' `"YV508978 Corp"' `"YV6
+> 54477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"YW771149 Corp"' `"YX040425
+>  Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602185 Corp"' `"ZB011331 Corp
+> "' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 Corp"' `"ZD802339 Corp"' `"
+> ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"' `"ZH026750 Corp"' `"ZH155
+> 210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH742226 Corp"' `"ZH742493 C
+> orp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ641246 Corp"' `"ZO419220 Corp"'
+>  `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Corp"'
+
+. local ncommon_bonds : word count `common_bonds'
+
+. 
+. levelsof issuer if sample_common, local(common_issuers)
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO SA"' `"CEMIG GERACAO E TR
+> ANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SAO PAULO"' `"CIA ELETRICI
+> DADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDERURGICA NACIONAL"' `"CO D
+> E GAS DE MINAS GERAI"' `"CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"
+> ' `"COPEL DISTRIBUICAO SA"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"'
+>  `"ENERGISA PB DIST"' `"ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATO
+> RIAL GOIAS DISTRI"' `"EQUATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"'
+>  `"HYPERMARCAS SA"' `"ISA ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN 
+> SA"' `"MILLS ESTRUTURA E SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MR
+> V ENGENHARIA PARTICIP"' `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RO
+> DOVIAS INT OESTE SA"' `"RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTOS BRASIL
+>  PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' `"
+> TRANSMISSORA ALIANCA EN"' `"VALE SA"'
+
+. local ncommon_issuers : word count `common_issuers'
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "WP-12C CONTROLLED LEVERAGE-PROXY SAMPLE"
+WP-12C CONTROLLED LEVERAGE-PROXY SAMPLE
+
+. di as result "WP-12A Book Debt / Market Cap support: `n_wp12a'"
+WP-12A Book Debt / Market Cap support: 3303
+
+. di as result "Total Debt / Total Assets support:     `n_tda'"
+Total Debt / Total Assets support:     4648
+
+. di as result "Controlled common sample:              `ncommon'"
+Controlled common sample:              3303
+
+. di as result "First month: " %tm `common_first'
+First month:  2011m3
+
+. di as result "Last month:  " %tm `common_last'
+Last month:   2025m6
+
+. di as result "Bonds:       `ncommon_bonds'"
+Bonds:       93
+
+. di as result "Issuers:     `ncommon_issuers'"
+Issuers:     44
+
+. 
+. if `n_wp12a' != 3303 {
+.     di as error "Expected WP-12A support of 3,303 observations."
+.     exit 459
+. }
+
+. 
+. if `n_tda' != 4648 {
+.     di as error "Expected Total Debt / Total Assets support of 4,648 observat
+> ions."
+.     exit 459
+. }
+
+. 
+. if `ncommon' != 3303 {
+.     di as error "Expected controlled common sample of 3,303 observations."
+.     exit 459
+. }
+
+. 
+. if `ncommon_bonds' != 93 {
+.     di as error "Expected 93 bonds in controlled sample."
+.     exit 459
+. }
+
+. 
+. if `ncommon_issuers' != 44 {
+.     di as error "Expected 44 issuers in controlled sample."
+.     exit 459
+. }
+
+. 
+. if `common_first' != tm(2011m3) {
+.     di as error "Expected controlled sample to start in 2011m3."
+.     exit 459
+. }
+
+. 
+. if `common_last' != tm(2025m6) {
+.     di as error "Expected controlled sample to end in 2025m6."
+.     exit 459
+. }
+
+. 
+. di as result "CONTROLLED SAMPLE LOCK: PASS"
+CONTROLLED SAMPLE LOCK: PASS
+
+. 
+. *============================================================================
+> ===
+. * 10. PROXY DESCRIPTIVES ON IDENTICAL SAMPLE
+. *============================================================================
+> ===
+. 
+. summarize ///
+>     book_debt_to_market_cap ///
+>     total_debt_to_total_assets ///
+>     if sample_common
+
+    Variable |        Obs        Mean    Std. Dev.       Min        Max
+-------------+---------------------------------------------------------
+book_debt_~p |      3,303    .8315243    .6787127   .0580501   9.549443
+total_debt~s |      3,303    36.17349    14.10556   2.088181   79.53697
+
+. 
+. pwcorr ///
+>     book_debt_to_market_cap ///
+>     total_debt_to_total_assets ///
+>     if sample_common, sig obs
+
+             | book_d~p total_~s
+-------------+------------------
+book_debt_~p |   1.0000 
+             |
+             |     3303
+             |
+total_debt~s |   0.3046   1.0000 
+             |   0.0000
+             |     3303     3303
+             |
+
+. 
+. *============================================================================
+> ===
+. * 11. PANEL SETUP
+. *============================================================================
+> ===
+. 
+. encode bond_id, gen(bond_id_num)
+
+. egen t_dk = group(month_id)
+
+. xtset bond_id_num t_dk
+       panel variable:  bond_id_num (unbalanced)
+        time variable:  t_dk, 1 to 175
+                delta:  1 unit
+
+. 
+. capture which xtscc
+
+. if _rc {
+.     di as error "xtscc is not installed."
+.     exit 499
+. }
+
+. 
+. capture which esttab
+
+. if _rc {
+.     di as error "esttab/estout is not installed."
+.     exit 499
+. }
+
+. 
+. *============================================================================
+> ===
+. * 12. CONTROLLED FE-DK ESTIMATIONS
+. *============================================================================
+> ===
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "M4 - BOOK DEBT / MARKET CAP"
+M4 - BOOK DEBT / MARKET CAP
+
+. xtscc spread `book4_x' if sample_common, fe lag(4)
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  9,   171)     =      3.33
+maximum lag: 4                                   Prob > F          =    0.0009
+                                                 within R-squared  =    0.0886
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.585546   .7296989     2.17   0.031     .1451682    3.025923
+real_fed_3~f |  -9.201154   5.698454    -1.61   0.108    -20.44953    2.047219
+real_excha~e |  -2.191574   .5741124    -3.82   0.000    -3.324834   -1.058315
+real_brazi~s |  -9.205164   2.620491    -3.51   0.001    -14.37784   -4.032487
+     gdp_yoy |  -.9428986   2.285846    -0.41   0.680    -5.455008    3.569211
+    debt_gdp |  -1.952792   3.914049    -0.50   0.618    -9.678866    5.773281
+sovereign_~l |  -1.015062   .3909239    -2.60   0.010     -1.78672   -.2434044
+book_debt_~p |   30.12956   14.87775     2.03   0.044     .7618617    59.49725
+days_to_ma~y |  -23.78653   7.458241    -3.19   0.002    -38.50861   -9.064456
+       _cons |   659.5452   149.5385     4.41   0.000     364.3662    954.7243
+------------------------------------------------------------------------------
+
+
+. if e(N)!=3303 | e(N_g)!=93 {
+.     di as error "Controlled regression did not retain 3,303 observations / 93
+>  bonds."
+.     exit 459
+. }
+
+. estimates store B4_DK
+
+. 
+. di as text "M4 - TOTAL DEBT / TOTAL ASSETS"
+M4 - TOTAL DEBT / TOTAL ASSETS
+
+. xtscc spread `tda4_x' if sample_common, fe lag(4)
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  9,   171)     =      3.25
+maximum lag: 4                                   Prob > F          =    0.0011
+                                                 within R-squared  =    0.0833
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.529065   .7270488     2.10   0.037     .0939188    2.964211
+real_fed_3~f |   -9.43406   5.783932    -1.63   0.105    -20.85116    1.983039
+real_excha~e |  -2.057149   .5535259    -3.72   0.000    -3.149772   -.9645252
+real_brazi~s |   -8.81645   2.527934    -3.49   0.001    -13.80643   -3.826474
+     gdp_yoy |  -.9649127   2.180989    -0.44   0.659    -5.270042    3.340216
+    debt_gdp |  -2.253534   3.924446    -0.57   0.567    -10.00013    5.493062
+sovereign_~l |   -1.15914   .3904989    -2.97   0.003    -1.929959   -.3883205
+total_debt~s |   1.663368   1.010315     1.65   0.102    -.3309269    3.657664
+days_to_ma~y |  -23.05647   7.354276    -3.14   0.002    -37.57333   -8.539619
+       _cons |   591.8215   146.2385     4.05   0.000     303.1562    880.4867
+------------------------------------------------------------------------------
+
+
+. if e(N)!=3303 | e(N_g)!=93 {
+.     di as error "Controlled regression did not retain 3,303 observations / 93
+>  bonds."
+.     exit 459
+. }
+
+. estimates store T4_DK
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "M5 - BOOK DEBT / MARKET CAP"
+M5 - BOOK DEBT / MARKET CAP
+
+. xtscc spread `book5_x' if sample_common, fe lag(4)
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  8,   171)     =      3.42
+maximum lag: 4                                   Prob > F          =    0.0011
+                                                 within R-squared  =    0.0747
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.130139   .7774711     1.45   0.148    -.4045374    2.664816
+real_fed_3~f |  -8.194252   6.240246    -1.31   0.191    -20.51209    4.123582
+real_excha~e |   -2.19132    .608006    -3.60   0.000    -3.391484   -.9911562
+real_brazi~s |  -8.770233   2.650759    -3.31   0.001    -14.00266   -3.537811
+     gdp_yoy |  -1.718191    2.11332    -0.81   0.417    -5.889745    2.453363
+    debt_gdp |  -2.686594   4.072875    -0.66   0.510    -10.72618    5.352993
+book_debt_~p |   33.10484   16.02199     2.07   0.040     1.478486    64.73118
+days_to_ma~y |  -24.41713   7.972966    -3.06   0.003    -40.15524    -8.67902
+       _cons |   654.2008   154.4385     4.24   0.000     349.3493    959.0523
+------------------------------------------------------------------------------
+
+
+. if e(N)!=3303 | e(N_g)!=93 {
+.     di as error "Controlled regression did not retain 3,303 observations / 93
+>  bonds."
+.     exit 459
+. }
+
+. estimates store B5_DK
+
+. 
+. di as text "M5 - TOTAL DEBT / TOTAL ASSETS"
+M5 - TOTAL DEBT / TOTAL ASSETS
+
+. xtscc spread `tda5_x' if sample_common, fe lag(4)
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  8,   171)     =      3.13
+maximum lag: 4                                   Prob > F          =    0.0025
+                                                 within R-squared  =    0.0652
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.012488   .7727158     1.31   0.192    -.5128022    2.537778
+real_fed_3~f |  -7.966361   6.374925    -1.25   0.213    -20.55004    4.617321
+real_excha~e |  -2.032921   .5864419    -3.47   0.001    -3.190518   -.8753231
+real_brazi~s |  -8.018591   2.525327    -3.18   0.002    -13.00342   -3.033762
+     gdp_yoy |  -1.902203   1.995175    -0.95   0.342    -5.840546     2.03614
+    debt_gdp |  -3.325731   4.186861    -0.79   0.428    -11.59032    4.938856
+total_debt~s |   1.365756   1.022751     1.34   0.184     -.653087    3.384599
+days_to_ma~y |  -23.05373   7.911378    -2.91   0.004    -38.67027   -7.437192
+       _cons |   586.5147   148.7354     3.94   0.000     292.9208    880.1087
+------------------------------------------------------------------------------
+
+
+. if e(N)!=3303 | e(N_g)!=93 {
+.     di as error "Controlled regression did not retain 3,303 observations / 93
+>  bonds."
+.     exit 459
+. }
+
+. estimates store T5_DK
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "M6 - BOOK DEBT / MARKET CAP"
+M6 - BOOK DEBT / MARKET CAP
+
+. xtscc spread `book6_x' if sample_common, fe lag(4)
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  7,   171)     =      1.06
+maximum lag: 4                                   Prob > F          =    0.3887
+                                                 within R-squared  =    0.0359
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.288292    .891945     1.44   0.150    -.4723481    3.048933
+real_fed_3~f |   -8.71726   6.811253    -1.28   0.202    -22.16222    4.727705
+real_excha~e |  -1.614561    .699703    -2.31   0.022    -2.995729   -.2333939
+     gdp_yoy |   1.065187    2.82191     0.38   0.706    -4.505076     6.63545
+    debt_gdp |   -6.15753   4.209775    -1.46   0.145    -14.46735    2.152287
+book_debt_~p |   17.26106   15.41004     1.12   0.264    -13.15735    47.67947
+days_to_ma~y |  -16.37009   9.107408    -1.80   0.074    -34.34751    1.607331
+       _cons |   420.3395   165.8107     2.54   0.012     93.04021    747.6388
+------------------------------------------------------------------------------
+
+
+. if e(N)!=3303 | e(N_g)!=93 {
+.     di as error "Controlled regression did not retain 3,303 observations / 93
+>  bonds."
+.     exit 459
+. }
+
+. estimates store B6_DK
+
+. 
+. di as text "M6 - TOTAL DEBT / TOTAL ASSETS"
+M6 - TOTAL DEBT / TOTAL ASSETS
+
+. xtscc spread `tda6_x' if sample_common, fe lag(4)
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  7,   171)     =      1.00
+maximum lag: 4                                   Prob > F          =    0.4309
+                                                 within R-squared  =    0.0322
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.226222   .8725437     1.41   0.162     -.496122    2.948565
+real_fed_3~f |  -8.275512   6.852876    -1.21   0.229    -21.80264    5.251613
+real_excha~e |  -1.560654   .6643632    -2.35   0.020    -2.872063   -.2492445
+     gdp_yoy |   .7321613   2.582912     0.28   0.777    -4.366336    5.830658
+    debt_gdp |  -6.422788   4.264729    -1.51   0.134    -14.84108    1.995506
+total_debt~s |   .3463154   1.088258     0.32   0.751    -1.801834    2.494465
+days_to_ma~y |  -15.63998   8.946032    -1.75   0.082    -33.29886    2.018895
+       _cons |   406.7934   153.0665     2.66   0.009     104.6503    708.9365
+------------------------------------------------------------------------------
+
+
+. if e(N)!=3303 | e(N_g)!=93 {
+.     di as error "Controlled regression did not retain 3,303 observations / 93
+>  bonds."
+.     exit 459
+. }
+
+. estimates store T6_DK
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "M8 - BOOK DEBT / MARKET CAP"
+M8 - BOOK DEBT / MARKET CAP
+
+. xtscc spread `book8_x' if sample_common, fe lag(4)
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F( 10,   171)     =      3.13
+maximum lag: 4                                   Prob > F          =    0.0011
+                                                 within R-squared  =    0.0930
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.524249   .7223677     2.11   0.036     .0983429    2.950155
+real_fed_3~f |  -8.989984   5.736156    -1.57   0.119    -20.31278     2.33281
+real_excha~e |  -2.128104   .5617672    -3.79   0.000    -3.236996   -1.019213
+real_brazi~s |  -9.465203   2.666848    -3.55   0.000    -14.72939   -4.201021
+     gdp_yoy |  -.6072518   2.289077    -0.27   0.791    -5.125738    3.911234
+    debt_gdp |  -1.989964   3.914363    -0.51   0.612    -9.716658     5.73673
+sovereign_~l |  -.9964452   .3895293    -2.56   0.011     -1.76535   -.2275401
+book_debt_~p |   27.96626    14.4003     1.94   0.054    -.4589817     56.3915
+cf_cash_op~t |  -.4107084   .2646254    -1.55   0.123    -.9330615    .1116447
+days_to_ma~y |  -23.50635   7.370311    -3.19   0.002    -38.05486   -8.957848
+       _cons |   657.8856   148.1569     4.44   0.000     365.4337    950.3376
+------------------------------------------------------------------------------
+
+
+. if e(N)!=3303 | e(N_g)!=93 {
+.     di as error "Controlled regression did not retain 3,303 observations / 93
+>  bonds."
+.     exit 459
+. }
+
+. estimates store B8_DK
+
+. 
+. di as text "M8 - TOTAL DEBT / TOTAL ASSETS"
+M8 - TOTAL DEBT / TOTAL ASSETS
+
+. xtscc spread `tda8_x' if sample_common, fe lag(4)
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F( 10,   171)     =      3.10
+maximum lag: 4                                   Prob > F          =    0.0012
+                                                 within R-squared  =    0.0894
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.459149   .7191767     2.03   0.044     .0395421    2.878757
+real_fed_3~f |   -9.27578   5.828557    -1.59   0.113    -20.78097    2.229406
+real_excha~e |   -1.99675   .5411029    -3.69   0.000    -3.064852   -.9286489
+real_brazi~s |  -9.235941   2.611907    -3.54   0.001    -14.39167    -4.08021
+     gdp_yoy |   -.552826    2.20357    -0.25   0.802    -4.902527    3.796875
+    debt_gdp |  -2.208078   3.913438    -0.56   0.573    -9.932946     5.51679
+sovereign_~l |  -1.131082   .3860825    -2.93   0.004    -1.893183   -.3689806
+total_debt~s |   1.675906   1.009704     1.66   0.099    -.3171821    3.668995
+cf_cash_op~t |  -.4821195   .2770842    -1.74   0.084    -1.029065    .0648263
+days_to_ma~y |  -22.99047   7.311164    -3.14   0.002    -37.42222   -8.558713
+       _cons |   592.9341   145.0228     4.09   0.000     306.6687    879.1996
+------------------------------------------------------------------------------
+
+
+. if e(N)!=3303 | e(N_g)!=93 {
+.     di as error "Controlled regression did not retain 3,303 observations / 93
+>  bonds."
+.     exit 459
+. }
+
+. estimates store T8_DK
+
+. 
+. *============================================================================
+> ===
+. * 13. SIDE-BY-SIDE CONTROLLED RESULTS
+. *============================================================================
+> ===
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "M4 CONTROLLED: BOOK/MKTCAP VS DEBT/ASSETS"
+M4 CONTROLLED: BOOK/MKTCAP VS DEBT/ASSETS
+
+. estimates table B4_DK T4_DK, b(%10.4f) se(%10.4f) stats(N r2_w)
+
+----------------------------------------
+    Variable |   B4_DK        T4_DK     
+-------------+--------------------------
+         vix |     1.5855       1.5291  
+             |     0.7297       0.7270  
+real_fed_3~f |    -9.2012      -9.4341  
+             |     5.6985       5.7839  
+real_excha~e |    -2.1916      -2.0571  
+             |     0.5741       0.5535  
+real_brazi~s |    -9.2052      -8.8164  
+             |     2.6205       2.5279  
+     gdp_yoy |    -0.9429      -0.9649  
+             |     2.2858       2.1810  
+    debt_gdp |    -1.9528      -2.2535  
+             |     3.9140       3.9244  
+sovereign_~l |    -1.0151      -1.1591  
+             |     0.3909       0.3905  
+book_debt_~p |    30.1296               
+             |    14.8778               
+days_to_ma~y |   -23.7865     -23.0565  
+             |     7.4582       7.3543  
+total_debt~s |                  1.6634  
+             |                  1.0103  
+       _cons |   659.5452     591.8215  
+             |   149.5385     146.2385  
+-------------+--------------------------
+           N |       3303         3303  
+        r2_w |     0.0886       0.0833  
+----------------------------------------
+                            legend: b/se
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "M5 CONTROLLED: BOOK/MKTCAP VS DEBT/ASSETS"
+M5 CONTROLLED: BOOK/MKTCAP VS DEBT/ASSETS
+
+. estimates table B5_DK T5_DK, b(%10.4f) se(%10.4f) stats(N r2_w)
+
+----------------------------------------
+    Variable |   B5_DK        T5_DK     
+-------------+--------------------------
+         vix |     1.1301       1.0125  
+             |     0.7775       0.7727  
+real_fed_3~f |    -8.1943      -7.9664  
+             |     6.2402       6.3749  
+real_excha~e |    -2.1913      -2.0329  
+             |     0.6080       0.5864  
+real_brazi~s |    -8.7702      -8.0186  
+             |     2.6508       2.5253  
+     gdp_yoy |    -1.7182      -1.9022  
+             |     2.1133       1.9952  
+    debt_gdp |    -2.6866      -3.3257  
+             |     4.0729       4.1869  
+book_debt_~p |    33.1048               
+             |    16.0220               
+days_to_ma~y |   -24.4171     -23.0537  
+             |     7.9730       7.9114  
+total_debt~s |                  1.3658  
+             |                  1.0228  
+       _cons |   654.2008     586.5147  
+             |   154.4385     148.7354  
+-------------+--------------------------
+           N |       3303         3303  
+        r2_w |     0.0747       0.0652  
+----------------------------------------
+                            legend: b/se
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "M6 CONTROLLED: BOOK/MKTCAP VS DEBT/ASSETS"
+M6 CONTROLLED: BOOK/MKTCAP VS DEBT/ASSETS
+
+. estimates table B6_DK T6_DK, b(%10.4f) se(%10.4f) stats(N r2_w)
+
+----------------------------------------
+    Variable |   B6_DK        T6_DK     
+-------------+--------------------------
+         vix |     1.2883       1.2262  
+             |     0.8919       0.8725  
+real_fed_3~f |    -8.7173      -8.2755  
+             |     6.8113       6.8529  
+real_excha~e |    -1.6146      -1.5607  
+             |     0.6997       0.6644  
+     gdp_yoy |     1.0652       0.7322  
+             |     2.8219       2.5829  
+    debt_gdp |    -6.1575      -6.4228  
+             |     4.2098       4.2647  
+book_debt_~p |    17.2611               
+             |    15.4100               
+days_to_ma~y |   -16.3701     -15.6400  
+             |     9.1074       8.9460  
+total_debt~s |                  0.3463  
+             |                  1.0883  
+       _cons |   420.3395     406.7934  
+             |   165.8107     153.0665  
+-------------+--------------------------
+           N |       3303         3303  
+        r2_w |     0.0359       0.0322  
+----------------------------------------
+                            legend: b/se
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "M8 CONTROLLED: BOOK/MKTCAP VS DEBT/ASSETS"
+M8 CONTROLLED: BOOK/MKTCAP VS DEBT/ASSETS
+
+. estimates table B8_DK T8_DK, b(%10.4f) se(%10.4f) stats(N r2_w)
+
+----------------------------------------
+    Variable |   B8_DK        T8_DK     
+-------------+--------------------------
+         vix |     1.5242       1.4591  
+             |     0.7224       0.7192  
+real_fed_3~f |    -8.9900      -9.2758  
+             |     5.7362       5.8286  
+real_excha~e |    -2.1281      -1.9968  
+             |     0.5618       0.5411  
+real_brazi~s |    -9.4652      -9.2359  
+             |     2.6668       2.6119  
+     gdp_yoy |    -0.6073      -0.5528  
+             |     2.2891       2.2036  
+    debt_gdp |    -1.9900      -2.2081  
+             |     3.9144       3.9134  
+sovereign_~l |    -0.9964      -1.1311  
+             |     0.3895       0.3861  
+book_debt_~p |    27.9663               
+             |    14.4003               
+cf_cash_op~t |    -0.4107      -0.4821  
+             |     0.2646       0.2771  
+days_to_ma~y |   -23.5064     -22.9905  
+             |     7.3703       7.3112  
+total_debt~s |                  1.6759  
+             |                  1.0097  
+       _cons |   657.8856     592.9341  
+             |   148.1569     145.0228  
+-------------+--------------------------
+           N |       3303         3303  
+        r2_w |     0.0930       0.0894  
+----------------------------------------
+                            legend: b/se
+
+. 
+. *============================================================================
+> ===
+. * 14. EXPORT CONTROLLED BRIDGE
+. *============================================================================
+> ===
+. 
+. local table_keep ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     book_debt_to_market_cap ///
+>     total_debt_to_total_assets ///
+>     cf_cash_oper_to_tot_asset ///
+>     days_to_maturity
+
+. 
+. local table_options ///
+>     keep(`table_keep') ///
+>     varlabels(vix "VIX" ///
+>               real_fed_3m_spf "Real Fed 3M forward" ///
+>               real_exchange_rate "Real USD/BRL index" ///
+>               real_brazil_3m_focus "Real Brazil 3M rate" ///
+>               gdp_yoy "GDP growth (YoY)" ///
+>               debt_gdp "Fiscal balance (% of GDP)" ///
+>               sovereign_spread_brl "Sovereign risk (BRL)" ///
+>               book_debt_to_market_cap "Book debt / equity market cap" ///
+>               total_debt_to_total_assets "Total debt / total assets (%)" ///
+>               cf_cash_oper_to_tot_asset "Operating cash flow / total assets" 
+> ///
+>               days_to_maturity "Residual maturity (years, BUS/252)") ///
+>     mtitles("M4 Book/MCap" ///
+>             "M4 Debt/Assets" ///
+>             "M5 Book/MCap" ///
+>             "M5 Debt/Assets" ///
+>             "M6 Book/MCap" ///
+>             "M6 Debt/Assets" ///
+>             "M8 Book/MCap" ///
+>             "M8 Debt/Assets") ///
+>     b(4) se(4) ///
+>     stats(N r2_w N_g, ///
+>           fmt(0 4 0) ///
+>           labels("Observations" ///
+>                  "Within R-squared" ///
+>                  "Number of bonds")) ///
+>     star(* 0.10 ** 0.05 *** 0.01) ///
+>     nocons nonotes ///
+>     addnotes("Controlled comparison: identical 3,303-observation sample in ev
+> ery column." ///
+>              "93 bonds; 44 issuers; March 2011 to June 2025." ///
+>              "Only the leverage proxy changes within each model pair." ///
+>              "Bond fixed effects in all specifications." ///
+>              "Driscoll-Kraay standard errors with maximum lag 4." ///
+>              "Book/MCap is the WP-12A robustness proxy." ///
+>              "Debt/Assets is the director-specified WP-12C fallback." ///
+>              "Leverage coefficients are not directly magnitude-comparable bec
+> ause proxy definitions/scales differ." ///
+>              "* p<0.10, ** p<0.05, *** p<0.01")
+
+. 
+. esttab ///
+>     B4_DK T4_DK ///
+>     B5_DK T5_DK ///
+>     B6_DK T6_DK ///
+>     B8_DK T8_DK ///
+>     using ///
+>     "`root'\src\econometrics\wp12c_reestimation\WP12C_Leverage_Proxy_Common_S
+> ample_Bridge.txt", ///
+>     replace `table_options'
+(note: file C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\econome
+> trics\wp12c_reestimation\WP12C_Leverage_Proxy_Common_Sample_Bridge.txt not fo
+> und)
+(output written to C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\
+> econometrics\wp12c_reestimation\WP12C_Leverage_Proxy_Common_Sample_Bridge.txt
+> )
+
+. 
+. esttab ///
+>     B4_DK T4_DK ///
+>     B5_DK T5_DK ///
+>     B6_DK T6_DK ///
+>     B8_DK T8_DK ///
+>     using ///
+>     "`root'\src\econometrics\wp12c_reestimation\WP12C_Leverage_Proxy_Common_S
+> ample_Bridge.rtf", ///
+>     replace rtf `table_options'
+(note: file C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\econome
+> trics\wp12c_reestimation\WP12C_Leverage_Proxy_Common_Sample_Bridge.rtf not fo
+> und)
+(output written to C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\
+> econometrics\wp12c_reestimation\WP12C_Leverage_Proxy_Common_Sample_Bridge.rtf
+> )
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as result "WP-12C CONTROLLED LEVERAGE PROXY BRIDGE COMPLETED"
+WP-12C CONTROLLED LEVERAGE PROXY BRIDGE COMPLETED
+
+. di as result "Common sample: 3,303 observations / 93 bonds / 44 issuers"
+Common sample: 3,303 observations / 93 bonds / 44 issuers
+
+. di as result "Window: 2011m3-2025m6"
+Window: 2011m3-2025m6
+
+. di as result "Only leverage proxy differs within each model pair."
+Only leverage proxy differs within each model pair.
+
+. di as result "DK maximum lag: 4"
+DK maximum lag: 4
+
+. di as text "============================================================"
+============================================================
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\econom
+> etrics\wp12c_reestimation\WP12C_Leverage_Proxy_Common_Sample_Bridge.log
+  log type:  text
+ closed on:  26 Oct 2026, 21:39:51
+-------------------------------------------------------------------------------

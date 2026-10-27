@@ -1,0 +1,64 @@
+WP-12C DIRECTOR-SPECIFIED LEVERAGE FALLBACK AUDIT
+
+Definition
+----------
+Main leverage field:
+Bloomberg TOT_DEBT_TO_TOT_ASSET
+
+Units:
+Percent of total assets.
+
+Historical Bloomberg query:
+BDP(parent equity ticker, TOT_DEBT_TO_TOT_ASSET,
+    FUND_PER=<quarter>, EQY_FUND_YEAR=<year>, fill=b)
+
+PIT convention
+--------------
+Uses the frozen accounting_source_quarter selected by
+scripts/build_econometrics_panel.py.
+
+That convention is shared with CFO/assets and Debt/EBITDA:
+latest eligible fiscal quarter at each exact corporate obs_date,
+one-quarter fallback when required, and the already-frozen
+two-quarter exception only where permitted by the canonical builder.
+
+Coverage
+--------
+Observations: 4,648
+Nonmissing leverage observations: 4,648
+Missing leverage observations: 0
+Coverage: 100.0000%
+Bonds: 103
+Issuers: 48
+First obs_date: 2010-12-30
+Last obs_date: 2025-06-30
+
+Distribution
+------------
+Minimum: 2.0881808938
+Median: 34.0857885715
+Maximum: 79.5369688733
+
+Lineage cross-check
+-------------------
+Constructed comparator:
+100 * SHORT_AND_LONG_TERM_DEBT / BS_TOT_ASSET
+
+Maximum absolute direct-vs-constructed difference:
+0.0004333262 percentage points
+
+Observations with absolute difference > 0.01 pp:
+0
+
+Decision
+--------
+PASS.
+
+Bloomberg TOT_DEBT_TO_TOT_ASSET is the director-specified
+Total Debt / Total Assets fallback.
+
+It preserves the full frozen panel:
+4,648 observations / 103 bonds / 48 issuers.
+
+Book Total Debt / Equity Market Cap remains a separate leverage
+robustness measure and is not the main-table leverage.
