@@ -1,0 +1,90 @@
+﻿TFM WP-07 - Driscoll-Kraay Bandwidth Sensitivity Audit
+
+QUESTION
+Martin Grandes asked whether the final results are sensitive to using
+Driscoll-Kraay lag(2) instead of the frozen baseline lag(4).
+
+BASELINE
+Frozen panel = panel_main_and_robustness_rebuilt_v4.xlsx
+Dependent variable = geometric corporate spread
+Estimator = bond fixed effects + Driscoll-Kraay
+Baseline bandwidth = lag(4)
+Sensitivity bandwidth = lag(2)
+Final common sample = 4,648 observations
+Bonds = 103
+Issuers = 48
+Window = 2010m12-2025m6
+Models audited = M1-M7
+
+AUDIT DESIGN
+No data, variable, sample, fixed-effect or model-specification changes.
+The only econometric change is:
+DK lag(4) -> DK lag(2)
+
+COMMON-SAMPLE CHECK
+All seven models:
+lag(4) N = 4,648
+lag(2) N = 4,648
+lag(4) bonds = 103
+lag(2) bonds = 103
+e(sample) differences between lag(4) and lag(2) = 0 in M1-M7
+
+POINT ESTIMATES
+Coefficient-model rows audited = 45
+Maximum absolute coefficient difference = 0.0000000000
+Sign changes = 0
+
+STANDARD ERRORS
+SE decreases under lag(2) = 40 / 45
+SE increases under lag(2) = 5 / 45
+SE unchanged = 0
+Mean SE change = -9.856%
+Minimum SE change = -19.062%
+Maximum SE change = +12.925%
+
+All five SE increases occur for VIX in M2-M6.
+None of these VIX estimates becomes statistically significant or crosses
+a significance threshold.
+
+SIGNIFICANCE
+Significance upgrades lag(4) -> lag(2) = 12
+Significance downgrades lag(4) -> lag(2) = 0
+
+M4
+real_brazil_3m_focus: none -> *
+real_exchange_rate: ** -> ***
+real_fed_3m_spf: none -> *
+tot_debt_to_ebitda: ** -> ***
+
+M5
+real_brazil_3m_focus: none -> *
+real_exchange_rate: ** -> ***
+real_fed_3m_spf: none -> *
+tot_debt_to_ebitda: ** -> ***
+
+M6
+real_exchange_rate: none -> *
+real_fed_3m_spf: * -> **
+tot_debt_to_ebitda: ** -> ***
+
+M7
+real_fed_3m_spf: ** -> ***
+
+M1-M3
+No significance-star changes.
+
+TAKEAWAY
+The final results are not fragile to using DK lag(2) instead of lag(4).
+Point estimates, signs and estimation samples are identical.
+Lag(2) generally produces smaller standard errors and stronger statistical
+significance. No statistically significant result is weakened or loses
+significance under lag(2).
+
+The frozen lag(4) specification is therefore the more conservative inference
+choice in this comparison.
+
+GOVERNANCE
+Frozen v4 panel was NOT modified.
+Canonical final_spec_seven_models_fe_dk.do was NOT modified.
+WP-06 remains DONE / FROZEN.
+Thesis and revision tracker were NOT updated during this audit.

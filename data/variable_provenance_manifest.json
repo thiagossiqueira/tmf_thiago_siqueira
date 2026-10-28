@@ -1,0 +1,444 @@
+{
+  "final_panel": {
+    "path": "datos_y_modelos\\db\\econometrics_db\\panel_main_and_robustness_rebuilt_v4.xlsx",
+    "exists": true,
+    "bytes": 538033,
+    "sha256": "3c46c1598b1b86b4de0cb42ab1eb58c7b5899cd98f3fb6b6a1fa5ad1a6a528dd",
+    "public_safe": false
+  },
+  "variables": [
+    {
+      "variable": "spread",
+      "label": "Spread corporativo IPCA",
+      "role": "dependent",
+      "description": "Variable dependiente del panel final. Se construye para cada bono-fecha utilizando la YTM corporativa y un benchmark real emparejado a la madurez residual exacta.",
+      "transformation": "[(1 + YTM_corporativa) / (1 + benchmark_real) - 1] * 10000. WLA/DAP tiene prioridad dentro de su soporte observado por fecha; fuera de ese soporte se utiliza directamente la curva zero-cupon NTN-B estimada mediante NSS.",
+      "source_files": [
+        "datos_y_modelos\\db\\brazil_domestic_corp_bonds\\corp_yld_ytm_mid_revised_monthly.v1.xlsx",
+        "datos_y_modelos\\Domestic\\universo_brazil_deb_des.xlsx",
+        "datos_y_modelos\\db\\id_x_ipca_spread_futures\\hist_ipca_curve_contracts_db.xlsx",
+        "datos_y_modelos\\Domestic\\domestic_sovereign_curve_brazil.v5.xlsx",
+        "datos_y_modelos\\db\\brazil_domestic_govt_bonds\\govt_ya_ande.v6.xlsx",
+        "data\\final_spread_backing_v4.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py",
+        "src\\core\\spread_calculator.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\db\\brazil_domestic_corp_bonds\\corp_yld_ytm_mid_revised_monthly.v1.xlsx",
+          "exists": true,
+          "bytes": 309957,
+          "sha256": "745929762173cf5e082016dbf5e1962a0114c9a1719150a1c2c6bb229fcbed35",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\Domestic\\universo_brazil_deb_des.xlsx",
+          "exists": true,
+          "bytes": 3137244,
+          "sha256": "08716c7eb654245ed7307b201e876c2649945d20bec9c872e39884c81e42cc5f",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\db\\id_x_ipca_spread_futures\\hist_ipca_curve_contracts_db.xlsx",
+          "exists": true,
+          "bytes": 381898,
+          "sha256": "2baef90f0a9ea8a33b8120215197692ebace33bda91405367834e6143f2ec516",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\Domestic\\domestic_sovereign_curve_brazil.v5.xlsx",
+          "exists": true,
+          "bytes": 61840,
+          "sha256": "ae5561ce9679cf300a365ceeed4af8ff5bbcf982df3c1bf46187da769c0c2807",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\db\\brazil_domestic_govt_bonds\\govt_ya_ande.v6.xlsx",
+          "exists": true,
+          "bytes": 50762,
+          "sha256": "b4b3e6eb2949b262c5432a1d1b67ca31839beca0e7f5e1181f2979a52d698fc9",
+          "public_safe": false
+        },
+        {
+          "path": "data\\final_spread_backing_v4.xlsx",
+          "exists": true,
+          "bytes": 854403,
+          "sha256": "0e871da7bd333ae0be7ba2d8d0195b5d7102bf55c52b79430b55bb2340c48fa5",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        },
+        {
+          "path": "src\\core\\spread_calculator.py",
+          "exists": true,
+          "bytes": 15601,
+          "sha256": "70d7e6c279ae44fbaeffc94a5300192cb24a190b7ba2b3b1a64a8732890deee0",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "vix",
+      "label": "VIX",
+      "role": "global",
+      "description": "Proxy de aversion global al riesgo.",
+      "transformation": "Serie mensual tomada de la columna 'Global Risk Aversion (Volatility Index)' del workbook macro.",
+      "source_files": [
+        "datos_y_modelos\\db\\brazil_macroeconomic_data\\macro_explanatory_variables.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\db\\brazil_macroeconomic_data\\macro_explanatory_variables.xlsx",
+          "exists": true,
+          "bytes": 118612,
+          "sha256": "ee0622d189e9f5522b5fcd7f6da5fc4dbc3a87fb09f9575f68018b73f8a282a0",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "fed_3m_forward",
+      "label": "Fed 3M Forward",
+      "role": "global",
+      "description": "Control de tasa corta esperada de Estados Unidos.",
+      "transformation": "USSOC Curncy / PX_LAST en frecuencia mensual auditada.",
+      "source_files": [
+        "datos_y_modelos\\db\\brazil_macroeconomic_data\\fed_3m_forward\\ussoc_monthly_2010_2025.csv"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\db\\brazil_macroeconomic_data\\fed_3m_forward\\ussoc_monthly_2010_2025.csv",
+          "exists": true,
+          "bytes": 6122,
+          "sha256": "cd8bea9ec80bc15814b202fe80ef386ab69d3a66ac826497dcd0f4c70b41a572",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "usd_brl",
+      "label": "USD/BRL",
+      "role": "local_macro",
+      "description": "Tipo de cambio spot, BRL por USD.",
+      "transformation": "Serie mensual 'USDBRL Spot Exchange Rate - Price of 1 USD in BRL'.",
+      "source_files": [
+        "datos_y_modelos\\db\\brazil_macroeconomic_data\\macro_explanatory_variables.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\db\\brazil_macroeconomic_data\\macro_explanatory_variables.xlsx",
+          "exists": true,
+          "bytes": 118612,
+          "sha256": "ee0622d189e9f5522b5fcd7f6da5fc4dbc3a87fb09f9575f68018b73f8a282a0",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "gdp_yoy",
+      "label": "PIB real interanual",
+      "role": "local_macro",
+      "description": "Crecimiento interanual del PIB real.",
+      "transformation": "BZGDYOY% Index. Los ceros usados como placeholders entre observaciones trimestrales se reemplazan por missing y luego se aplica carry-forward del ultimo dato trimestral valido.",
+      "source_files": [
+        "datos_y_modelos\\db\\brazil_macroeconomic_data\\macro_explanatory_variables.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\db\\brazil_macroeconomic_data\\macro_explanatory_variables.xlsx",
+          "exists": true,
+          "bytes": 118612,
+          "sha256": "ee0622d189e9f5522b5fcd7f6da5fc4dbc3a87fb09f9575f68018b73f8a282a0",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "debt_gdp",
+      "label": "Balance fiscal (% PIB) - nombre legacy debt_gdp",
+      "role": "local_macro",
+      "description": "El nombre de columna debt_gdp se conserva por compatibilidad, pero la serie economica utilizada es Brazil Budget Balance (% GDP), Bloomberg EHBBBR Index.",
+      "transformation": "Serie trimestral desestacionalizada. Los ceros placeholders se reemplazan por missing y se hace carry-forward del ultimo dato trimestral valido.",
+      "source_files": [
+        "datos_y_modelos\\db\\brazil_macroeconomic_data\\macro_explanatory_variables.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\db\\brazil_macroeconomic_data\\macro_explanatory_variables.xlsx",
+          "exists": true,
+          "bytes": 118612,
+          "sha256": "ee0622d189e9f5522b5fcd7f6da5fc4dbc3a87fb09f9575f68018b73f8a282a0",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "cf_cash_oper_to_tot_asset",
+      "label": "Cash flow operativo / activos",
+      "role": "firm",
+      "description": "Proxy contable de liquidez/capacidad interna de generacion de caja.",
+      "transformation": "1000 * CF_CASH_FROM_OPER / BS_TOT_ASSET. Unidad: por mil.",
+      "source_files": [
+        "datos_y_modelos\\db\\issuers_fundamental_data\\CF_CASH_FROM_OPER.xlsx",
+        "datos_y_modelos\\db\\issuers_fundamental_data\\BS_TOT_ASSET.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\db\\issuers_fundamental_data\\CF_CASH_FROM_OPER.xlsx",
+          "exists": true,
+          "bytes": 4061926,
+          "sha256": "3050fa600c77dfb23ccd96943c8cb0fea8d733d031816676b0a771c0a1316a29",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\db\\issuers_fundamental_data\\BS_TOT_ASSET.xlsx",
+          "exists": true,
+          "bytes": 4180640,
+          "sha256": "98c13d09ffbf0478bfc18a0973ec8cc5b7b516e129308f1841d20b063ba84b2e",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "amount_issued_to_bs_tot_asset",
+      "label": "Tamano relativo de la emision",
+      "role": "bond_firm",
+      "description": "Tamano de la emision relativo al balance del emisor.",
+      "transformation": "((AMT_ISSUED / 1e6) / BS_TOT_ASSET) * 1000. Unidad: por mil; activos del mismo trimestre calendario.",
+      "source_files": [
+        "datos_y_modelos\\Domestic\\universo_brazil_deb_des.xlsx",
+        "datos_y_modelos\\db\\issuers_fundamental_data\\BS_TOT_ASSET.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\Domestic\\universo_brazil_deb_des.xlsx",
+          "exists": true,
+          "bytes": 3137244,
+          "sha256": "08716c7eb654245ed7307b201e876c2649945d20bec9c872e39884c81e42cc5f",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\db\\issuers_fundamental_data\\BS_TOT_ASSET.xlsx",
+          "exists": true,
+          "bytes": 4180640,
+          "sha256": "98c13d09ffbf0478bfc18a0973ec8cc5b7b516e129308f1841d20b063ba84b2e",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "tot_debt_to_ebitda",
+      "label": "Deuda total / EBITDA",
+      "role": "firm",
+      "description": "Medida de leverage presente en el panel base. La especificacion principal WP-12C utiliza Total Debt / Total Assets como control principal de leverage.",
+      "transformation": "SHORT_AND_LONG_TERM_DEBT / EBITDA. Unidad: veces.",
+      "source_files": [
+        "datos_y_modelos\\db\\issuers_fundamental_data\\SHORT_AND_LONG_TERM_DEBT.xlsx",
+        "datos_y_modelos\\db\\issuers_fundamental_data\\EBITDA.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\db\\issuers_fundamental_data\\SHORT_AND_LONG_TERM_DEBT.xlsx",
+          "exists": true,
+          "bytes": 4149748,
+          "sha256": "4b2bfa6fea5547a499c0e4f24cefe2edb683aca25765af2282b65426d277a985",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\db\\issuers_fundamental_data\\EBITDA.xlsx",
+          "exists": true,
+          "bytes": 4057603,
+          "sha256": "696a2861521e7cb9fc49934800e05d7835627a823e9d0d0f623f5126e2ecccd9",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "days_to_maturity",
+      "label": "Madurez residual BUS/252",
+      "role": "bond",
+      "description": "Pese al nombre legacy days_to_maturity, la variable econometrica esta expresada en anos, no en dias calendario.",
+      "transformation": "Fraccion de ano entre obs_date y maturity bajo la convencion ANBIMA BUS/252.",
+      "source_files": [
+        "datos_y_modelos\\Domestic\\universo_brazil_deb_des.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\Domestic\\universo_brazil_deb_des.xlsx",
+          "exists": true,
+          "bytes": 3137244,
+          "sha256": "08716c7eb654245ed7307b201e876c2649945d20bec9c872e39884c81e42cc5f",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    },
+    {
+      "variable": "sovereign_spread_brl",
+      "label": "Spread soberano BRL por tenor",
+      "role": "sovereign",
+      "description": "Medida de riesgo soberano en moneda local emparejada al tenor residual de cada bono corporativo. No es un CDS contractual.",
+      "transformation": "Curva soberana nominal zero-cupon construida mediante bootstrap BUS/252 de LTN y NTN-F; se interpola al tenor residual del bono y se compara geometricamente contra la curva DI zero-cupon.",
+      "source_files": [
+        "datos_y_modelos\\Domestic\\domestic_sovereign_curve_brazil.v5.xlsx",
+        "datos_y_modelos\\db\\brazil_domestic_govt_bonds\\govt_ya_ande.v6.xlsx",
+        "datos_y_modelos\\db\\one-day_interbank_deposit_futures_contract_di\\di_curve.v6.xlsx"
+      ],
+      "code_files": [
+        "scripts\\build_econometrics_panel.py"
+      ],
+      "sources": [
+        {
+          "path": "datos_y_modelos\\Domestic\\domestic_sovereign_curve_brazil.v5.xlsx",
+          "exists": true,
+          "bytes": 61840,
+          "sha256": "ae5561ce9679cf300a365ceeed4af8ff5bbcf982df3c1bf46187da769c0c2807",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\db\\brazil_domestic_govt_bonds\\govt_ya_ande.v6.xlsx",
+          "exists": true,
+          "bytes": 50762,
+          "sha256": "b4b3e6eb2949b262c5432a1d1b67ca31839beca0e7f5e1181f2979a52d698fc9",
+          "public_safe": false
+        },
+        {
+          "path": "datos_y_modelos\\db\\one-day_interbank_deposit_futures_contract_di\\di_curve.v6.xlsx",
+          "exists": true,
+          "bytes": 731711,
+          "sha256": "8db65b29aa35f549815b6774d96927711e43e752de96496dcd4d68c5cc4750d3",
+          "public_safe": false
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts\\build_econometrics_panel.py",
+          "exists": true,
+          "bytes": 82148,
+          "sha256": "70baeeeb2ffaa05d6970731e1aee996fe2dd86137c937d6233a2f8a94e0d9619",
+          "public_safe": false
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "legacy_panel": "panel_main_and_robustness.xlsx is retained only for historical provenance and is not the final econometric panel.",
+    "public_download_policy": "Raw Bloomberg-derived source workbooks are documented for auditability but must not be exposed automatically on a public deployment. Derived/public-safe files and code can be enabled separately."
+  }
+}

@@ -1,0 +1,2055 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\econom
+> etrics\wp12b_reestimation\WP12B_SND_Liquidity_Annex_FE_DK.log
+  log type:  text
+ opened on:  26 Oct 2026, 20:05:15
+
+. 
+. *============================================================================
+> ===
+. * 1. LOAD FROZEN WP-06 PANEL
+. *============================================================================
+> ===
+. 
+. import excel using ///
+>     "`root'\datos_y_modelos\db\econometrics_db\panel_main_and_robustness_rebu
+> ilt_v4.xlsx", ///
+>     sheet("ts") firstrow clear
+
+. 
+. gen double month_id = mofd(dofc(month))
+
+. format month_id %tm
+
+. 
+. count if missing(month_id)
+  0
+
+. if r(N)>0 {
+.     di as error "month_id could not be constructed for all frozen-panel rows.
+> "
+.     exit 198
+. }
+
+. 
+. tempfile frozen_panel
+
+. save `frozen_panel'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_7538_000001.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 2. LOAD CPI LEVEL INPUTS FOR BILATERAL RER
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\datos_y_modelos\db\real_exchange_rate_inputs\rer_cpi_monthly_inpu
+> ts.csv", ///
+>     varnames(1) clear
+(5 vars, 175 obs)
+
+. 
+. gen double cpi_date = date(month, "YMD")
+
+. gen double month_id = mofd(cpi_date)
+
+. format month_id %tm
+
+. 
+. isid month_id
+
+. 
+. keep month_id cpi_us_index cpi_br_index us_series_id br_series_id
+
+. 
+. tempfile rer_inputs
+
+. save `rer_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_7538_000002.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 3. LOAD VALIDATED REAL FED 3M INPUT
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\datos_y_modelos\db\brazil_macroeconomic_data\real_fed_3m\real_fed
+> _3m_spf_monthly.csv", ///
+>     varnames(1) clear
+(10 vars, 175 obs)
+
+. 
+. gen double real_fed_date = date(month_end, "YMD")
+
+. gen double month_id = mofd(real_fed_date)
+
+. format month_id %tm
+
+. 
+. isid month_id
+
+. 
+. keep month_id ///
+>     ussoc_px_last ///
+>     spf_cpi_next_quarter ///
+>     real_fed_3m_spf ///
+>     real_fed_3m_spf_exact
+
+. 
+. tempfile real_fed_inputs
+
+. save `real_fed_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_7538_000003.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 4. LOAD VALIDATED REAL BRAZIL 3M INPUT
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\datos_y_modelos\db\brazil_macroeconomic_data\real_brazil_3m\real_
+> brazil_3m_focus_panel_dates.csv", ///
+>     varnames(1) clear
+(26 vars, 175 obs)
+
+. 
+. gen double real_brazil_date = date(obs_date, "YMD")
+
+. gen double month_id = mofd(real_brazil_date)
+
+. format month_id %tm
+
+. 
+. isid month_id
+
+. 
+. count if missing(real_brazil_3m_focus)
+  0
+
+. if r(N)>0 {
+.     di as error "Missing primary Real Brazil 3M values."
+.     exit 459
+. }
+
+. 
+. count if abs(nominal_di_canonical_diff_bp) > 1e-9 ///
+>     & !missing(nominal_di_canonical_diff_bp)
+  0
+
+. if r(N)>0 {
+.     di as error "Real Brazil input fails canonical DI reconciliation."
+.     exit 459
+. }
+
+. 
+. keep month_id ///
+>     nominal_brazil_3m_di_pct ///
+>     expected_ipca_ann_pct ///
+>     real_brazil_3m_focus ///
+>     real_brazil_3m_focus_exact ///
+>     nominal_di_canonical_diff_bp
+
+. 
+. tempfile real_brazil_inputs
+
+. save `real_brazil_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_7538_000004.tmp saved
+
+. *============================================================================
+> ===
+. * 5A. LOAD FROZEN BOOK DEBT / MARKET CAP CANDIDATE
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\output\Informes jurado\WP12_same_entity_book_debt_to_mktcap_4648_
+> brl_only.csv", ///
+>     varnames(1) clear
+(23 vars, 4,648 obs)
+
+. 
+. gen double leverage_date = date(obs_date, "YMD")
+
+. gen double month_id = mofd(leverage_date)
+
+. format month_id %tm
+
+. 
+. count if missing(month_id)
+  0
+
+. if r(N)>0 {
+.     di as error "Could not construct leverage month_id."
+.     exit 459
+. }
+
+. 
+. isid bond_id month_id
+
+. 
+. keep bond_id month_id book_debt_to_market_cap
+
+. 
+. count if !missing(book_debt_to_market_cap)
+  3,303
+
+. if r(N) != 3303 {
+.     di as error "Expected 3,303 nonmissing book debt / market cap observation
+> s."
+.     exit 459
+. }
+
+. 
+. tempfile leverage_inputs
+
+. save `leverage_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_7538_000005.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 5B. LOAD FROZEN SND HISTORICAL BOND-LIQUIDITY CANDIDATE
+. *============================================================================
+> ===
+. 
+. import delimited using ///
+>     "`root'\datos_y_modelos\db\econometrics_db\wp06d_bond_liquidity_snd_candi
+> date_v1.csv", ///
+>     varnames(1) clear
+(8 vars, 4,648 obs)
+
+. 
+. * Stata 15 may preserve the UTF-8 BOM attached to the first CSV header.
+. * Do not modify the frozen WP-06D candidate; normalize only the imported name
+> .
+. capture confirm variable bond_id
+
+. if _rc {
+.     unab snd_import_vars : _all
+.     local snd_first_var : word 1 of `snd_import_vars'
+.     rename `snd_first_var' bond_id
+. }
+
+. 
+. capture confirm variable bond_id
+
+. if _rc {
+.     di as error "Could not recover bond_id after SND UTF-8 BOM normalization.
+> "
+.     exit 459
+. }
+
+. 
+. gen double liquidity_snd_date = date(obs_date, "YMD")
+
+. gen double month_id = mofd(liquidity_snd_date)
+
+. format month_id %tm
+
+. 
+. count if missing(month_id)
+  0
+
+. if r(N)>0 {
+.     di as error "Could not construct SND liquidity month_id."
+.     exit 459
+. }
+
+. 
+. isid bond_id month_id
+
+. 
+. count
+  4,648
+
+. if r(N) != 4648 {
+.     di as error "Expected 4,648 rows in frozen SND liquidity candidate."
+.     exit 459
+. }
+
+. 
+. count if liquidity_snd_usable == 1
+  4,648
+
+. if r(N) != 4648 {
+.     di as error "Expected all 4,648 SND bond-months to be usable."
+.     exit 459
+. }
+
+. 
+. count if !missing(bond_trading_day_share_snd)
+  4,648
+
+. if r(N) != 4648 {
+.     di as error "Expected 4,648 nonmissing SND bond trading-day shares."
+.     exit 459
+. }
+
+. 
+. keep bond_id month_id liquidity_snd_usable bond_trading_day_share_snd
+
+. 
+. tempfile liquidity_snd_inputs
+
+. save `liquidity_snd_inputs'
+file C:\Users\TSIQUE~1\AppData\Local\Temp\ST_7538_000006.tmp saved
+
+. 
+. *============================================================================
+> ===
+. * 5. RESTORE FROZEN PANEL AND MERGE RER INPUTS
+. *============================================================================
+> ===
+. 
+. use `frozen_panel', clear
+
+. 
+. merge m:1 month_id using `rer_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error "CPI/RER merge did not match all frozen-panel observations."
+.     tab _merge
+.     exit 459
+. }
+
+. drop _merge
+
+. 
+. count if missing(cpi_us_index, cpi_br_index)
+  0
+
+. if r(N)>0 {
+.     di as error "Missing CPI inputs after RER merge."
+.     exit 459
+. }
+
+. 
+. * Bilateral real USD/BRL:
+. * RER_t = USD/BRL_t * CPI_US_t / CPI_BR_t
+. * Increase = BRL real depreciation.
+. 
+. gen double rer_usd_brl = ///
+>     usd_brl * cpi_us_index / cpi_br_index
+
+. 
+. quietly summarize rer_usd_brl if month_id == tm(2010m12), meanonly
+
+. local base_rer = r(mean)
+
+. 
+. if missing(`base_rer') {
+.     di as error "December 2010 RER base value is missing."
+.     exit 459
+. }
+
+. 
+. gen double real_exchange_rate = ///
+>     100 * rer_usd_brl / `base_rer'
+
+. 
+. label variable real_exchange_rate ///
+>     "Real USD/BRL index; increase = BRL real depreciation"
+
+. 
+. *============================================================================
+> ===
+. * 6. MERGE REAL FED 3M
+. *============================================================================
+> ===
+. 
+. merge m:1 month_id using `real_fed_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error "Real-Fed input does not match all frozen-panel observations.
+> "
+.     tab _merge
+.     exit 459
+. }
+
+. 
+. * Validated Real-Fed SPF coverage now spans the full frozen-panel window,
+. * 2010m12-2025m6, with no missing month-end observations.
+. 
+. gen double fed_nominal_diff = ///
+>     abs(fed_3m_forward - ussoc_px_last) if _merge == 3
+
+. 
+. quietly summarize fed_nominal_diff, meanonly
+
+. di as result ///
+>     "MAX |frozen-panel Fed - Real-Fed nominal input|: " %12.10f r(max)
+MAX |frozen-panel Fed - Real-Fed nominal input|: 0.0000002274
+
+. 
+. count if fed_nominal_diff > 1e-6 & !missing(fed_nominal_diff)
+  0
+
+. if r(N)>0 {
+.     di as error ///
+>         "Real-Fed nominal leg does not reproduce frozen-panel fed_3m_forward.
+> "
+.     exit 459
+. }
+
+. 
+. drop _merge fed_nominal_diff
+
+. 
+. label variable real_fed_3m_spf ///
+>     "Real US 3M OIS: USSOC minus SPF expected next-quarter CPI"
+
+. 
+. *============================================================================
+> ===
+. * 7. MERGE REAL BRAZIL 3M
+. *============================================================================
+> ===
+. 
+. merge m:1 month_id using `real_brazil_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error ///
+>         "Real Brazil 3M input did not match all frozen-panel months."
+.     tab _merge
+.     exit 459
+. }
+
+. drop _merge
+
+. 
+. quietly summarize nominal_di_canonical_diff_bp, meanonly
+
+. di as result ///
+>     "MAX |Brazil nominal DI - canonical DI| (bp): " %12.10f r(max)
+MAX |Brazil nominal DI - canonical DI| (bp): 0.0000000000
+
+. 
+. label variable real_brazil_3m_focus ///
+>     "Real Brazil 3M DI: nominal DI minus Focus expected IPCA"
+
+. 
+. *============================================================================
+> ===
+. * 7A. MERGE FROZEN LEVERAGE AND HISTORICAL SND LIQUIDITY
+. *============================================================================
+> ===
+. 
+. merge 1:1 bond_id month_id using `leverage_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error "Frozen leverage candidate did not match all panel bond-month
+>  keys."
+.     tab _merge
+.     exit 459
+. }
+
+. drop _merge
+
+. 
+. count if !missing(book_debt_to_market_cap)
+  3,303
+
+. if r(N) != 3303 {
+.     di as error "Expected 3,303 nonmissing leverage observations after merge.
+> "
+.     exit 459
+. }
+
+. 
+. merge 1:1 bond_id month_id using `liquidity_snd_inputs'
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                             0
+    matched                             4,648  (_merge==3)
+    -----------------------------------------
+
+. 
+. count if _merge != 3
+  0
+
+. if r(N)>0 {
+.     di as error "Frozen SND bond-liquidity candidate did not match all panel 
+> bond-month keys."
+.     tab _merge
+.     exit 459
+. }
+
+. drop _merge
+
+. 
+. count if !missing(bond_trading_day_share_snd)
+  4,648
+
+. if r(N) != 4648 {
+.     di as error "Expected 4,648 nonmissing SND bond-liquidity observations af
+> ter merge."
+.     exit 459
+. }
+
+. 
+. count if liquidity_snd_usable != 1
+  0
+
+. if r(N)>0 {
+.     di as error "Unexpected unusable SND observations after merge."
+.     exit 459
+. }
+
+. 
+. label variable book_debt_to_market_cap ///
+>     "Book debt / equity market cap"
+
+. 
+. label variable bond_trading_day_share_snd ///
+>     "SND verified trading days / eligible trading days"
+
+. 
+. * 8. HISTORICAL SND ANNEX EIGHT-COLUMN FE-DK X-MATRIX
+. *
+. * M1  Global
+. * M2  Global + local macro
+. * M3  Global + local macro + sovereign risk
+. * M4  Full: M3 + new leverage + historical SND liquidity + maturity
+. * M5  Full 2: M4 without sovereign risk
+. * M6  Full 3: M5 without Real Brazil 3M
+. * M7  Parsimonious: VIX + Real Fed 3M + sovereign risk
+. * M8  M4 + OCF/assets
+. *
+. * Frozen specification decisions inherited from WP-08:
+. *   Corporate spread -> geometric spread
+. *   Bond FE + Driscoll-Kraay lag(4)
+. *   Real Fed         -> real_fed_3m_spf
+. *   USD/BRL RER      -> real_exchange_rate
+. *   Brazil 3M        -> real_brazil_3m_focus
+. *   Fiscal           -> EHBBBR stored in debt_gdp
+. *   Sovereign risk   -> sovereign_spread_brl
+. *   Leverage         -> book_debt_to_market_cap
+. *   Bond liquidity   -> historical SND trading-day share; annex only
+. *
+. * OCF/assets is excluded from M1-M7 and returns only in M8.
+. * tot_debt_to_ebitda is excluded from the WP-12B annex micro block.
+. * No nominal USD/BRL.
+. * No nominal Fed 3M.
+. * No amount_issued_to_bs_tot_asset.
+. *============================================================================
+> ===
+. 
+. local model1_x ///
+>     vix ///
+>     real_fed_3m_spf
+
+. 
+. local model2_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp
+
+. 
+. local model3_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl
+
+. 
+. local model4_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     book_debt_to_market_cap ///
+>     bond_trading_day_share_snd ///
+>     days_to_maturity
+
+. 
+. local model5_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     book_debt_to_market_cap ///
+>     bond_trading_day_share_snd ///
+>     days_to_maturity
+
+. 
+. local model6_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     book_debt_to_market_cap ///
+>     bond_trading_day_share_snd ///
+>     days_to_maturity
+
+. 
+. local model7_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     sovereign_spread_brl
+
+. 
+. local model8_x ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     book_debt_to_market_cap ///
+>     bond_trading_day_share_snd ///
+>     cf_cash_oper_to_tot_asset ///
+>     days_to_maturity
+
+. 
+. *============================================================================
+> ===
+. * 9. NATURAL COMPLETE-CASE SAMPLE BY MODEL
+. *============================================================================
+> ===
+. 
+. forvalues m = 1/8 {
+  2.     gen byte sample_m`m' = 1
+  3.     markout sample_m`m' spread `model`m'_x'
+  4. 
+.     di as text "============================================================"
+  5.     di as text "MODEL `m' NATURAL COMPLETE-CASE SAMPLE"
+  6. 
+.     count if sample_m`m'
+  7.     local nobs = r(N)
+  8.     di as result "Observations: `nobs'"
+  9. 
+.     quietly summarize month_id if sample_m`m', meanonly
+ 10.     di as result "First month: " %tm r(min)
+ 11.     di as result "Last month:  " %tm r(max)
+ 12. 
+.     levelsof bond_id if sample_m`m', local(bonds)
+ 13.     local nbonds : word count `bonds'
+ 14.     di as result "Number of bonds: `nbonds'"
+ 15. 
+.     levelsof issuer if sample_m`m', local(issuers)
+ 16.     local nissuers : word count `issuers'
+ 17.     di as result "Number of issuers: `nissuers'"
+ 18. 
+.     if inlist(`m',1,2,3,7) {
+ 19.         if `nobs' != 4648 {
+ 20.             di as error "Model `m' should retain the full 4,648-observatio
+> n panel."
+ 21.             exit 459
+ 22.         }
+ 23.     }
+ 24. 
+.     if inlist(`m',4,5,6,8) {
+ 25.         if `nobs' != 3303 {
+ 26.             di as error "Model `m' should have 3,303 observations in its n
+> atural sample."
+ 27.             exit 459
+ 28.         }
+ 29.     }
+ 30. }
+============================================================
+MODEL 1 NATURAL COMPLETE-CASE SAMPLE
+  4,648
+Observations: 4648
+First month: 2010m12
+Last month:   2025m6
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS071367 Corp"'
+>  `"BS195336 Corp"' `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW
+> 472288 Corp"' `"BW472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW49800
+> 2 Corp"' `"BX225588 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Cor
+> p"' `"EI050425 Corp"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI301231 Corp"' `
+> "EI648119 Corp"' `"EI854063 Corp"' `"EJ087310 Corp"' `"EJ088074 Corp"' `"EJ38
+> 3826 Corp"' `"EJ493748 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK055372 
+> Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK064417 Corp"' `"EK070894 Corp"
+> ' `"EK128086 Corp"' `"EK141999 Corp"' `"EK142053 Corp"' `"EK142311 Corp"' `"E
+> K142341 Corp"' `"EK571905 Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ6247
+> 82 Corp"' `"UV462972 Corp"' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Co
+> rp"' `"YQ206351 Corp"' `"YQ208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' 
+> `"YS128174 Corp"' `"YS228296 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT7
+> 61883 Corp"' `"YU283312 Corp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769
+>  Corp"' `"YU835365 Corp"' `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp
+> "' `"YV508978 Corp"' `"YV654477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"
+> YW771149 Corp"' `"YX040425 Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602
+> 185 Corp"' `"ZB011331 Corp"' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 C
+> orp"' `"ZD802339 Corp"' `"ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"'
+>  `"ZH026750 Corp"' `"ZH155210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH
+> 742226 Corp"' `"ZH742493 Corp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ64124
+> 6 Corp"' `"ZO419220 Corp"' `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Cor
+> p"'
+Number of bonds: 103
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"AUTO RAPOSO TAVARES"' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO S
+> A"' `"CEMIG GERACAO E TRANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SA
+> O PAULO"' `"CIA ELETRICIDADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDER
+> URGICA NACIONAL"' `"CO DE GAS DE MINAS GERAI"' `"CONCESSIONARIA DO AEROPO"' `
+> "CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"' `"COPEL DISTRIBUICAO S
+> A"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"' `"ENERGISA PB DIST"' `"
+> ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATORIAL GOIAS DISTRI"' `"EQ
+> UATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"' `"HYPERMARCAS SA"' `"IS
+> A ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN SA"' `"MILLS ESTRUTURA E
+>  SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MRV ENGENHARIA PARTICIP"' 
+> `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RODOVIAS INT OESTE SA"' `"
+> RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTO ANTONIO ENERGIA"' `"SANTOS BRAS
+> IL PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' 
+> `"TRANSMISSORA ALIANCA EN"' `"UNIDAS SA"' `"VALE SA"'
+Number of issuers: 48
+============================================================
+MODEL 2 NATURAL COMPLETE-CASE SAMPLE
+  4,648
+Observations: 4648
+First month: 2010m12
+Last month:   2025m6
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS071367 Corp"'
+>  `"BS195336 Corp"' `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW
+> 472288 Corp"' `"BW472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW49800
+> 2 Corp"' `"BX225588 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Cor
+> p"' `"EI050425 Corp"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI301231 Corp"' `
+> "EI648119 Corp"' `"EI854063 Corp"' `"EJ087310 Corp"' `"EJ088074 Corp"' `"EJ38
+> 3826 Corp"' `"EJ493748 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK055372 
+> Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK064417 Corp"' `"EK070894 Corp"
+> ' `"EK128086 Corp"' `"EK141999 Corp"' `"EK142053 Corp"' `"EK142311 Corp"' `"E
+> K142341 Corp"' `"EK571905 Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ6247
+> 82 Corp"' `"UV462972 Corp"' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Co
+> rp"' `"YQ206351 Corp"' `"YQ208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' 
+> `"YS128174 Corp"' `"YS228296 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT7
+> 61883 Corp"' `"YU283312 Corp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769
+>  Corp"' `"YU835365 Corp"' `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp
+> "' `"YV508978 Corp"' `"YV654477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"
+> YW771149 Corp"' `"YX040425 Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602
+> 185 Corp"' `"ZB011331 Corp"' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 C
+> orp"' `"ZD802339 Corp"' `"ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"'
+>  `"ZH026750 Corp"' `"ZH155210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH
+> 742226 Corp"' `"ZH742493 Corp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ64124
+> 6 Corp"' `"ZO419220 Corp"' `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Cor
+> p"'
+Number of bonds: 103
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"AUTO RAPOSO TAVARES"' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO S
+> A"' `"CEMIG GERACAO E TRANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SA
+> O PAULO"' `"CIA ELETRICIDADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDER
+> URGICA NACIONAL"' `"CO DE GAS DE MINAS GERAI"' `"CONCESSIONARIA DO AEROPO"' `
+> "CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"' `"COPEL DISTRIBUICAO S
+> A"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"' `"ENERGISA PB DIST"' `"
+> ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATORIAL GOIAS DISTRI"' `"EQ
+> UATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"' `"HYPERMARCAS SA"' `"IS
+> A ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN SA"' `"MILLS ESTRUTURA E
+>  SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MRV ENGENHARIA PARTICIP"' 
+> `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RODOVIAS INT OESTE SA"' `"
+> RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTO ANTONIO ENERGIA"' `"SANTOS BRAS
+> IL PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' 
+> `"TRANSMISSORA ALIANCA EN"' `"UNIDAS SA"' `"VALE SA"'
+Number of issuers: 48
+============================================================
+MODEL 3 NATURAL COMPLETE-CASE SAMPLE
+  4,648
+Observations: 4648
+First month: 2010m12
+Last month:   2025m6
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS071367 Corp"'
+>  `"BS195336 Corp"' `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW
+> 472288 Corp"' `"BW472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW49800
+> 2 Corp"' `"BX225588 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Cor
+> p"' `"EI050425 Corp"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI301231 Corp"' `
+> "EI648119 Corp"' `"EI854063 Corp"' `"EJ087310 Corp"' `"EJ088074 Corp"' `"EJ38
+> 3826 Corp"' `"EJ493748 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK055372 
+> Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK064417 Corp"' `"EK070894 Corp"
+> ' `"EK128086 Corp"' `"EK141999 Corp"' `"EK142053 Corp"' `"EK142311 Corp"' `"E
+> K142341 Corp"' `"EK571905 Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ6247
+> 82 Corp"' `"UV462972 Corp"' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Co
+> rp"' `"YQ206351 Corp"' `"YQ208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' 
+> `"YS128174 Corp"' `"YS228296 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT7
+> 61883 Corp"' `"YU283312 Corp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769
+>  Corp"' `"YU835365 Corp"' `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp
+> "' `"YV508978 Corp"' `"YV654477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"
+> YW771149 Corp"' `"YX040425 Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602
+> 185 Corp"' `"ZB011331 Corp"' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 C
+> orp"' `"ZD802339 Corp"' `"ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"'
+>  `"ZH026750 Corp"' `"ZH155210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH
+> 742226 Corp"' `"ZH742493 Corp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ64124
+> 6 Corp"' `"ZO419220 Corp"' `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Cor
+> p"'
+Number of bonds: 103
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"AUTO RAPOSO TAVARES"' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO S
+> A"' `"CEMIG GERACAO E TRANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SA
+> O PAULO"' `"CIA ELETRICIDADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDER
+> URGICA NACIONAL"' `"CO DE GAS DE MINAS GERAI"' `"CONCESSIONARIA DO AEROPO"' `
+> "CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"' `"COPEL DISTRIBUICAO S
+> A"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"' `"ENERGISA PB DIST"' `"
+> ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATORIAL GOIAS DISTRI"' `"EQ
+> UATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"' `"HYPERMARCAS SA"' `"IS
+> A ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN SA"' `"MILLS ESTRUTURA E
+>  SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MRV ENGENHARIA PARTICIP"' 
+> `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RODOVIAS INT OESTE SA"' `"
+> RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTO ANTONIO ENERGIA"' `"SANTOS BRAS
+> IL PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' 
+> `"TRANSMISSORA ALIANCA EN"' `"UNIDAS SA"' `"VALE SA"'
+Number of issuers: 48
+============================================================
+MODEL 4 NATURAL COMPLETE-CASE SAMPLE
+  3,303
+Observations: 3303
+First month:  2011m3
+Last month:   2025m6
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS195336 Corp"'
+>  `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW472288 Corp"' `"BW
+> 472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW498002 Corp"' `"BX22558
+> 8 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Corp"' `"EI050425 Cor
+> p"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI648119 Corp"' `"EJ087310 Corp"' `
+> "EJ088074 Corp"' `"EJ383826 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK05
+> 5372 Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK070894 Corp"' `"EK571905 
+> Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ624782 Corp"' `"UV462972 Corp"
+> ' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Corp"' `"YQ206351 Corp"' `"Y
+> Q208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' `"YS128174 Corp"' `"YS2282
+> 96 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT761883 Corp"' `"YU283312 Co
+> rp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769 Corp"' `"YU835365 Corp"' 
+> `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp"' `"YV508978 Corp"' `"YV6
+> 54477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"YW771149 Corp"' `"YX040425
+>  Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602185 Corp"' `"ZB011331 Corp
+> "' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 Corp"' `"ZD802339 Corp"' `"
+> ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"' `"ZH026750 Corp"' `"ZH155
+> 210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH742226 Corp"' `"ZH742493 C
+> orp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ641246 Corp"' `"ZO419220 Corp"'
+>  `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Corp"'
+Number of bonds: 93
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO SA"' `"CEMIG GERACAO E TR
+> ANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SAO PAULO"' `"CIA ELETRICI
+> DADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDERURGICA NACIONAL"' `"CO D
+> E GAS DE MINAS GERAI"' `"CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"
+> ' `"COPEL DISTRIBUICAO SA"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"'
+>  `"ENERGISA PB DIST"' `"ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATO
+> RIAL GOIAS DISTRI"' `"EQUATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"'
+>  `"HYPERMARCAS SA"' `"ISA ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN 
+> SA"' `"MILLS ESTRUTURA E SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MR
+> V ENGENHARIA PARTICIP"' `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RO
+> DOVIAS INT OESTE SA"' `"RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTOS BRASIL
+>  PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' `"
+> TRANSMISSORA ALIANCA EN"' `"VALE SA"'
+Number of issuers: 44
+============================================================
+MODEL 5 NATURAL COMPLETE-CASE SAMPLE
+  3,303
+Observations: 3303
+First month:  2011m3
+Last month:   2025m6
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS195336 Corp"'
+>  `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW472288 Corp"' `"BW
+> 472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW498002 Corp"' `"BX22558
+> 8 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Corp"' `"EI050425 Cor
+> p"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI648119 Corp"' `"EJ087310 Corp"' `
+> "EJ088074 Corp"' `"EJ383826 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK05
+> 5372 Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK070894 Corp"' `"EK571905 
+> Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ624782 Corp"' `"UV462972 Corp"
+> ' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Corp"' `"YQ206351 Corp"' `"Y
+> Q208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' `"YS128174 Corp"' `"YS2282
+> 96 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT761883 Corp"' `"YU283312 Co
+> rp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769 Corp"' `"YU835365 Corp"' 
+> `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp"' `"YV508978 Corp"' `"YV6
+> 54477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"YW771149 Corp"' `"YX040425
+>  Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602185 Corp"' `"ZB011331 Corp
+> "' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 Corp"' `"ZD802339 Corp"' `"
+> ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"' `"ZH026750 Corp"' `"ZH155
+> 210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH742226 Corp"' `"ZH742493 C
+> orp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ641246 Corp"' `"ZO419220 Corp"'
+>  `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Corp"'
+Number of bonds: 93
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO SA"' `"CEMIG GERACAO E TR
+> ANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SAO PAULO"' `"CIA ELETRICI
+> DADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDERURGICA NACIONAL"' `"CO D
+> E GAS DE MINAS GERAI"' `"CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"
+> ' `"COPEL DISTRIBUICAO SA"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"'
+>  `"ENERGISA PB DIST"' `"ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATO
+> RIAL GOIAS DISTRI"' `"EQUATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"'
+>  `"HYPERMARCAS SA"' `"ISA ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN 
+> SA"' `"MILLS ESTRUTURA E SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MR
+> V ENGENHARIA PARTICIP"' `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RO
+> DOVIAS INT OESTE SA"' `"RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTOS BRASIL
+>  PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' `"
+> TRANSMISSORA ALIANCA EN"' `"VALE SA"'
+Number of issuers: 44
+============================================================
+MODEL 6 NATURAL COMPLETE-CASE SAMPLE
+  3,303
+Observations: 3303
+First month:  2011m3
+Last month:   2025m6
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS195336 Corp"'
+>  `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW472288 Corp"' `"BW
+> 472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW498002 Corp"' `"BX22558
+> 8 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Corp"' `"EI050425 Cor
+> p"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI648119 Corp"' `"EJ087310 Corp"' `
+> "EJ088074 Corp"' `"EJ383826 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK05
+> 5372 Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK070894 Corp"' `"EK571905 
+> Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ624782 Corp"' `"UV462972 Corp"
+> ' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Corp"' `"YQ206351 Corp"' `"Y
+> Q208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' `"YS128174 Corp"' `"YS2282
+> 96 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT761883 Corp"' `"YU283312 Co
+> rp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769 Corp"' `"YU835365 Corp"' 
+> `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp"' `"YV508978 Corp"' `"YV6
+> 54477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"YW771149 Corp"' `"YX040425
+>  Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602185 Corp"' `"ZB011331 Corp
+> "' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 Corp"' `"ZD802339 Corp"' `"
+> ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"' `"ZH026750 Corp"' `"ZH155
+> 210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH742226 Corp"' `"ZH742493 C
+> orp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ641246 Corp"' `"ZO419220 Corp"'
+>  `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Corp"'
+Number of bonds: 93
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO SA"' `"CEMIG GERACAO E TR
+> ANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SAO PAULO"' `"CIA ELETRICI
+> DADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDERURGICA NACIONAL"' `"CO D
+> E GAS DE MINAS GERAI"' `"CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"
+> ' `"COPEL DISTRIBUICAO SA"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"'
+>  `"ENERGISA PB DIST"' `"ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATO
+> RIAL GOIAS DISTRI"' `"EQUATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"'
+>  `"HYPERMARCAS SA"' `"ISA ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN 
+> SA"' `"MILLS ESTRUTURA E SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MR
+> V ENGENHARIA PARTICIP"' `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RO
+> DOVIAS INT OESTE SA"' `"RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTOS BRASIL
+>  PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' `"
+> TRANSMISSORA ALIANCA EN"' `"VALE SA"'
+Number of issuers: 44
+============================================================
+MODEL 7 NATURAL COMPLETE-CASE SAMPLE
+  4,648
+Observations: 4648
+First month: 2010m12
+Last month:   2025m6
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS071367 Corp"'
+>  `"BS195336 Corp"' `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW
+> 472288 Corp"' `"BW472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW49800
+> 2 Corp"' `"BX225588 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Cor
+> p"' `"EI050425 Corp"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI301231 Corp"' `
+> "EI648119 Corp"' `"EI854063 Corp"' `"EJ087310 Corp"' `"EJ088074 Corp"' `"EJ38
+> 3826 Corp"' `"EJ493748 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK055372 
+> Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK064417 Corp"' `"EK070894 Corp"
+> ' `"EK128086 Corp"' `"EK141999 Corp"' `"EK142053 Corp"' `"EK142311 Corp"' `"E
+> K142341 Corp"' `"EK571905 Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ6247
+> 82 Corp"' `"UV462972 Corp"' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Co
+> rp"' `"YQ206351 Corp"' `"YQ208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' 
+> `"YS128174 Corp"' `"YS228296 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT7
+> 61883 Corp"' `"YU283312 Corp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769
+>  Corp"' `"YU835365 Corp"' `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp
+> "' `"YV508978 Corp"' `"YV654477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"
+> YW771149 Corp"' `"YX040425 Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602
+> 185 Corp"' `"ZB011331 Corp"' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 C
+> orp"' `"ZD802339 Corp"' `"ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"'
+>  `"ZH026750 Corp"' `"ZH155210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH
+> 742226 Corp"' `"ZH742493 Corp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ64124
+> 6 Corp"' `"ZO419220 Corp"' `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Cor
+> p"'
+Number of bonds: 103
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"AUTO RAPOSO TAVARES"' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO S
+> A"' `"CEMIG GERACAO E TRANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SA
+> O PAULO"' `"CIA ELETRICIDADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDER
+> URGICA NACIONAL"' `"CO DE GAS DE MINAS GERAI"' `"CONCESSIONARIA DO AEROPO"' `
+> "CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"' `"COPEL DISTRIBUICAO S
+> A"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"' `"ENERGISA PB DIST"' `"
+> ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATORIAL GOIAS DISTRI"' `"EQ
+> UATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"' `"HYPERMARCAS SA"' `"IS
+> A ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN SA"' `"MILLS ESTRUTURA E
+>  SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MRV ENGENHARIA PARTICIP"' 
+> `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RODOVIAS INT OESTE SA"' `"
+> RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTO ANTONIO ENERGIA"' `"SANTOS BRAS
+> IL PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' 
+> `"TRANSMISSORA ALIANCA EN"' `"UNIDAS SA"' `"VALE SA"'
+Number of issuers: 48
+============================================================
+MODEL 8 NATURAL COMPLETE-CASE SAMPLE
+  3,303
+Observations: 3303
+First month:  2011m3
+Last month:   2025m6
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS195336 Corp"'
+>  `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW472288 Corp"' `"BW
+> 472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW498002 Corp"' `"BX22558
+> 8 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Corp"' `"EI050425 Cor
+> p"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI648119 Corp"' `"EJ087310 Corp"' `
+> "EJ088074 Corp"' `"EJ383826 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK05
+> 5372 Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK070894 Corp"' `"EK571905 
+> Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ624782 Corp"' `"UV462972 Corp"
+> ' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Corp"' `"YQ206351 Corp"' `"Y
+> Q208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' `"YS128174 Corp"' `"YS2282
+> 96 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT761883 Corp"' `"YU283312 Co
+> rp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769 Corp"' `"YU835365 Corp"' 
+> `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp"' `"YV508978 Corp"' `"YV6
+> 54477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"YW771149 Corp"' `"YX040425
+>  Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602185 Corp"' `"ZB011331 Corp
+> "' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 Corp"' `"ZD802339 Corp"' `"
+> ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"' `"ZH026750 Corp"' `"ZH155
+> 210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH742226 Corp"' `"ZH742493 C
+> orp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ641246 Corp"' `"ZO419220 Corp"'
+>  `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Corp"'
+Number of bonds: 93
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO SA"' `"CEMIG GERACAO E TR
+> ANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SAO PAULO"' `"CIA ELETRICI
+> DADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDERURGICA NACIONAL"' `"CO D
+> E GAS DE MINAS GERAI"' `"CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"
+> ' `"COPEL DISTRIBUICAO SA"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"'
+>  `"ENERGISA PB DIST"' `"ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATO
+> RIAL GOIAS DISTRI"' `"EQUATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"'
+>  `"HYPERMARCAS SA"' `"ISA ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN 
+> SA"' `"MILLS ESTRUTURA E SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MR
+> V ENGENHARIA PARTICIP"' `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RO
+> DOVIAS INT OESTE SA"' `"RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTOS BRASIL
+>  PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' `"
+> TRANSMISSORA ALIANCA EN"' `"VALE SA"'
+Number of issuers: 44
+
+. 
+. * M8 adds OCF/assets to M4. OCF/assets must not further restrict the
+. * already leverage-constrained M4 sample.
+. count if sample_m4 != sample_m8
+  0
+
+. if r(N)>0 {
+.     di as error "M8 OCF/assets unexpectedly changes the M4 complete-case samp
+> le."
+.     exit 459
+. }
+
+. 
+. *============================================================================
+> ===
+. * 10. WP-12B SND ANNEX SAMPLE BRIDGE
+. *============================================================================
+> ===
+. 
+. count
+  4,648
+
+. local bridge_panel = r(N)
+
+. if `bridge_panel' != 4648 {
+.     di as error "Frozen panel no longer contains 4,648 observations."
+.     exit 459
+. }
+
+. 
+. count if !missing(book_debt_to_market_cap)
+  3,303
+
+. local bridge_leverage = r(N)
+
+. if `bridge_leverage' != 3303 {
+.     di as error "Leverage bridge should contain 3,303 observations."
+.     exit 459
+. }
+
+. 
+. count if !missing(bond_trading_day_share_snd)
+  4,648
+
+. local bridge_snd = r(N)
+
+. if `bridge_snd' != 4648 {
+.     di as error "Historical SND liquidity should cover all 4,648 frozen-panel
+>  observations."
+.     exit 459
+. }
+
+. 
+. * Reconstruct preferred WP-12A M8 complete-case sample without SND.
+. gen byte sample_wp12a_reference = 1
+
+. markout sample_wp12a_reference ///
+>     spread ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     book_debt_to_market_cap ///
+>     cf_cash_oper_to_tot_asset ///
+>     days_to_maturity
+
+. 
+. count if sample_wp12a_reference
+  3,303
+
+. local bridge_wp12a = r(N)
+
+. if `bridge_wp12a' != 3303 {
+.     di as error "Reconstructed WP-12A reference sample should contain 3,303 o
+> bservations."
+.     exit 459
+. }
+
+. 
+. count if sample_m8
+  3,303
+
+. local bridge_wp12b = r(N)
+
+. if `bridge_wp12b' != 3303 {
+.     di as error "WP-12B M8-SND complete-case sample should contain 3,303 obse
+> rvations."
+.     exit 459
+. }
+
+. 
+. count if sample_wp12a_reference != sample_m8
+  0
+
+. local bridge_sample_diff = r(N)
+
+. if `bridge_sample_diff' != 0 {
+.     di as error "Historical SND liquidity changes the WP-12A common-sample co
+> mposition."
+.     exit 459
+. }
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "WP-12B SND ANNEX SAMPLE BRIDGE"
+WP-12B SND ANNEX SAMPLE BRIDGE
+
+. di as result "Frozen v4 panel:                         `bridge_panel'"
+Frozen v4 panel:                         4648
+
+. di as result "Nonmissing new leverage:                 `bridge_leverage'"
+Nonmissing new leverage:                 3303
+
+. di as result "Nonmissing historical SND liquidity:     `bridge_snd'"
+Nonmissing historical SND liquidity:     4648
+
+. di as result "WP-12A reconstructed common sample:      `bridge_wp12a'"
+WP-12A reconstructed common sample:      3303
+
+. di as result "WP-12B M8-SND complete-case sample:      `bridge_wp12b'"
+WP-12B M8-SND complete-case sample:      3303
+
+. di as result "WP-12A vs WP-12B sample differences:     `bridge_sample_diff'"
+WP-12A vs WP-12B sample differences:     0
+
+. 
+. *============================================================================
+> ===
+. * 11. STRICT COMMON SND ANNEX SAMPLE
+. *
+. * M8 contains the union of all regressors appearing anywhere in M1-M8.
+. * Therefore its complete-case sample is the strict common sample used
+. * for the eight-column historical SND annex table.
+. *============================================================================
+> ===
+. 
+. gen byte sample_common = sample_m8
+
+. 
+. count if sample_common
+  3,303
+
+. local ncommon = r(N)
+
+. 
+. quietly summarize month_id if sample_common, meanonly
+
+. local common_first = r(min)
+
+. local common_last  = r(max)
+
+. 
+. levelsof bond_id if sample_common, local(common_bonds)
+`"AM250786 Corp"' `"AM934900 Corp"' `"AN275276 Corp"' `"AP304401 Corp"' `"AQ373
+> 215 Corp"' `"BG015275 Corp"' `"BK296481 Corp"' `"BQ418507 Corp"' `"BQ418645 C
+> orp"' `"BQ883112 Corp"' `"BR877654 Corp"' `"BS068433 Corp"' `"BS195336 Corp"'
+>  `"BU507495 Corp"' `"BV932280 Corp"' `"BV932351 Corp"' `"BW472288 Corp"' `"BW
+> 472328 Corp"' `"BW473011 Corp"' `"BW497354 Corp"' `"BW498002 Corp"' `"BX22558
+> 8 Corp"' `"BX954131 Corp"' `"BX954171 Corp"' `"BY457215 Corp"' `"EI050425 Cor
+> p"' `"EI092876 Corp"' `"EI290797 Corp"' `"EI648119 Corp"' `"EJ087310 Corp"' `
+> "EJ088074 Corp"' `"EJ383826 Corp"' `"EJ588860 Corp"' `"EJ589035 Corp"' `"EK05
+> 5372 Corp"' `"EK055396 Corp"' `"EK055420 Corp"' `"EK070894 Corp"' `"EK571905 
+> Corp"' `"EK648499 Corp"' `"EK883780 Corp"' `"QZ624782 Corp"' `"UV462972 Corp"
+> ' `"YN335920 Corp"' `"YO670482 Corp"' `"YP718140 Corp"' `"YQ206351 Corp"' `"Y
+> Q208159 Corp"' `"YQ839719 Corp"' `"YQ840089 Corp"' `"YS128174 Corp"' `"YS2282
+> 96 Corp"' `"YS230637 Corp"' `"YS837387 Corp"' `"YT761883 Corp"' `"YU283312 Co
+> rp"' `"YU286737 Corp"' `"YU310933 Corp"' `"YU355769 Corp"' `"YU835365 Corp"' 
+> `"YU835792 Corp"' `"YV413479 Corp"' `"YV486752 Corp"' `"YV508978 Corp"' `"YV6
+> 54477 Corp"' `"YV676520 Corp"' `"YW157250 Corp"' `"YW771149 Corp"' `"YX040425
+>  Corp"' `"YX040855 Corp"' `"YX600860 Corp"' `"YX602185 Corp"' `"ZB011331 Corp
+> "' `"ZB548158 Corp"' `"ZB828103 Corp"' `"ZB934221 Corp"' `"ZD802339 Corp"' `"
+> ZF941921 Corp"' `"ZG133848 Corp"' `"ZG995941 Corp"' `"ZH026750 Corp"' `"ZH155
+> 210 Corp"' `"ZH196537 Corp"' `"ZH598042 Corp"' `"ZH742226 Corp"' `"ZH742493 C
+> orp"' `"ZH789567 Corp"' `"ZH789625 Corp"' `"ZJ641246 Corp"' `"ZO419220 Corp"'
+>  `"ZO514485 Corp"' `"ZO514510 Corp"' `"ZQ942599 Corp"'
+
+. local ncommon_bonds : word count `common_bonds'
+
+. 
+. levelsof issuer if sample_common, local(common_issuers)
+`"AES TIETE ENERGIA SA"' `"AES TUCANO HOLDING II SA"' `"AUREN PARTICIPACOES SA"
+> ' `"BRAVA ENERGIA"' `"CCR SA"' `"CEMIG DISTRIBUICAO SA"' `"CEMIG GERACAO E TR
+> ANSM"' `"CENTRAIS ELETRICAS ELET"' `"CIA DE GAS DE SAO PAULO"' `"CIA ELETRICI
+> DADE AMAPA"' `"CIA ESTADUAL GERACAO ENE"' `"CIA SIDERURGICA NACIONAL"' `"CO D
+> E GAS DE MINAS GERAI"' `"CONCESSIONARIA ROD INTEG"' `"CONTEINERES VILA CONDE"
+> ' `"COPEL DISTRIBUICAO SA"' `"CSN MINERACAO SA"' `"ENERGISA MATO GROSSO DIS"'
+>  `"ENERGISA PB DIST"' `"ENERGISA SA"' `"ENEVA SA"' `"EQTL MARANHAO"' `"EQUATO
+> RIAL GOIAS DISTRI"' `"EQUATORIAL PARA DISTRIBU"' `"FURNAS CENTRAIS ELETRICA"'
+>  `"HYPERMARCAS SA"' `"ISA ENERGIA BRASIL SA"' `"JALLES MACHADO SA"' `"KLABIN 
+> SA"' `"MILLS ESTRUTURA E SERV"' `"MOTIVA INFRA SA"' `"MRS LOGISTICA SA"' `"MR
+> V ENGENHARIA PARTICIP"' `"PARANAIBA TRANSMISSORA"' `"RAIZEN ENERGIA SA"' `"RO
+> DOVIAS INT OESTE SA"' `"RUMO  MALHA PAULISTA SA"' `"RUMO SA"' `"SANTOS BRASIL
+>  PARTICIPAC"' `"SERENA GERACAO SA"' `"SUZANO SA"' `"TRANSMISSAO PAULISTA"' `"
+> TRANSMISSORA ALIANCA EN"' `"VALE SA"'
+
+. local ncommon_issuers : word count `common_issuers'
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "STRICT COMMON SND ANNEX SAMPLE"
+STRICT COMMON SND ANNEX SAMPLE
+
+. di as result "Observations: `ncommon'"
+Observations: 3303
+
+. di as result "First month:  " %tm `common_first'
+First month:   2011m3
+
+. di as result "Last month:   " %tm `common_last'
+Last month:    2025m6
+
+. di as result "Bonds:        `ncommon_bonds'"
+Bonds:        93
+
+. di as result "Issuers:      `ncommon_issuers'"
+Issuers:      44
+
+. 
+. * Verify that the strict common sample is admissible in every model.
+. forvalues m = 1/8 {
+  2.     count if sample_common & !sample_m`m'
+  3.     if r(N)>0 {
+  4.         di as error "Strict common sample is not nested inside Model `m'."
+  5.         exit 459
+  6.     }
+  7. }
+  0
+  0
+  0
+  0
+  0
+  0
+  0
+  0
+
+. 
+. *============================================================================
+> ===
+. * 12. LOCK WP-12B HISTORICAL SND ANNEX SAMPLE
+. *============================================================================
+> ===
+. 
+. if `ncommon' != 3303 {
+.     di as error "Expected 3,303 observations in WP-12B common sample."
+.     exit 459
+. }
+
+. 
+. if `ncommon_bonds' != 93 {
+.     di as error "Expected 93 bonds in WP-12B common sample."
+.     exit 459
+. }
+
+. 
+. if `ncommon_issuers' != 44 {
+.     di as error "Expected 44 issuers in WP-12B common sample."
+.     exit 459
+. }
+
+. 
+. if `common_first' != tm(2011m3) {
+.     di as error "Expected WP-12B common sample to start in 2011m3."
+.     exit 459
+. }
+
+. 
+. if `common_last' != tm(2025m6) {
+.     di as error "Expected WP-12B common sample to end in 2025m6."
+.     exit 459
+. }
+
+. 
+. di as result "WP-12B historical SND annex sample lock: PASS"
+WP-12B historical SND annex sample lock: PASS
+
+. 
+. *============================================================================
+> ===
+. * 13. PANEL SETUP FOR DRISCOLL-KRAAY
+. *============================================================================
+> ===
+. 
+. encode bond_id, gen(bond_id_num)
+
+. egen t_dk = group(month_id)
+
+. xtset bond_id_num t_dk
+       panel variable:  bond_id_num (unbalanced)
+        time variable:  t_dk, 1 to 175
+                delta:  1 unit
+
+. 
+. capture which xtscc
+
+. if _rc {
+.     di as error "xtscc is not installed."
+.     exit 499
+. }
+
+. 
+. capture which esttab
+
+. if _rc {
+.     di as error "esttab/estout is not installed."
+.     exit 499
+. }
+
+. 
+. *============================================================================
+> ===
+. * 14. ESTIMATE HISTORICAL SND ANNEX EIGHT MODELS
+. *============================================================================
+> ===
+. 
+. forvalues m = 1/8 {
+  2. 
+.     di as text "============================================================"
+  3.     di as text "SND ANNEX FE-DK MODEL `m'"
+  4.     di as text "==========================================================
+> =="
+  5. 
+.     xtscc spread `model`m'_x' if sample_common, fe lag(4)
+  6.     estimates store M`m'_DK
+  7. 
+.     local m`m'_N   = e(N)
+  8.     local m`m'_Ng  = e(N_g)
+  9.     local m`m'_r2w = e(r2_w)
+ 10. 
+.     if `m`m'_N' != `ncommon' {
+ 11.         di as error "Model `m' does not use the locked WP-12B common sampl
+> e."
+ 12.         exit 459
+ 13.     }
+ 14. 
+.     if `m`m'_Ng' != `ncommon_bonds' {
+ 15.         di as error "Model `m' does not use all locked WP-12B common-sampl
+> e bonds."
+ 16.         exit 459
+ 17.     }
+ 18. 
+.     * Companion FE regression only to recover rho.
+.     xtreg spread `model`m'_x' if sample_common, fe
+ 19.     local m`m'_rho = e(rho)
+ 20. 
+.     estadd scalar rho = `m`m'_rho' : M`m'_DK
+ 21. }
+============================================================
+SND ANNEX FE-DK MODEL 1
+============================================================
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  2,   171)     =      0.21
+maximum lag: 4                                   Prob > F          =    0.8141
+                                                 within R-squared  =    0.0012
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |  -.5891197    1.02735    -0.57   0.567    -2.617042    1.438802
+real_fed_3~f |   .4294921    4.45453     0.10   0.923    -8.363456     9.22244
+       _cons |   98.65949    20.9322     4.71   0.000     57.34072    139.9783
+------------------------------------------------------------------------------
+
+
+Fixed-effects (within) regression               Number of obs     =      3,303
+Group variable: bond_id_num                     Number of groups  =         93
+
+R-sq:                                           Obs per group:
+     within  = 0.0012                                         min =          1
+     between = 0.1279                                         avg =       35.5
+     overall = 0.0002                                         max =        143
+
+                                                F(2,3208)         =       1.96
+corr(u_i, Xb)  = -0.0523                        Prob > F          =     0.1406
+
+------------------------------------------------------------------------------
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |  -.5891197   .3541195    -1.66   0.096    -1.283443    .1052037
+real_fed_3~f |   .4294921   1.541424     0.28   0.781    -2.592784    3.451768
+       _cons |   98.65949   6.752521    14.61   0.000      85.4198    111.8992
+-------------+----------------------------------------------------------------
+     sigma_u |   93.30936
+     sigma_e |   108.5354
+         rho |  .42499242   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+F test that all u_i=0: F(92, 3208) = 35.79                   Prob > F = 0.0000
+============================================================
+SND ANNEX FE-DK MODEL 2
+============================================================
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  6,   171)     =      1.73
+maximum lag: 4                                   Prob > F          =    0.1157
+                                                 within R-squared  =    0.0279
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |    .672986   .7626716     0.88   0.379    -.8324775    2.178449
+real_fed_3~f |   2.641625   4.825196     0.55   0.585    -6.882993    12.16624
+real_excha~e |  -.6480354      .3534    -1.83   0.068    -1.345624    .0495529
+real_brazi~s |  -4.998546   2.374055    -2.11   0.037    -9.684774   -.3123174
+     gdp_yoy |   1.549292   2.730201     0.57   0.571    -3.839945    6.938529
+    debt_gdp |  -3.371884   4.509172    -0.75   0.456    -12.27269    5.528924
+       _cons |   200.2146   62.78557     3.19   0.002     76.28004    324.1492
+------------------------------------------------------------------------------
+
+
+Fixed-effects (within) regression               Number of obs     =      3,303
+Group variable: bond_id_num                     Number of groups  =         93
+
+R-sq:                                           Obs per group:
+     within  = 0.0279                                         min =          1
+     between = 0.2456                                         avg =       35.5
+     overall = 0.1167                                         max =        143
+
+                                                F(6,3204)         =      15.33
+corr(u_i, Xb)  = 0.2658                         Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |    .672986   .4286479     1.57   0.117     -.167466    1.513438
+real_fed_3~f |   2.641625   1.655841     1.60   0.111    -.6049904    5.888241
+real_excha~e |  -.6480354   .1066747    -6.07   0.000    -.8571929   -.4388779
+real_brazi~s |  -4.998546   .7106764    -7.03   0.000    -6.391972   -3.605119
+     gdp_yoy |   1.549292   .8677967     1.79   0.074    -.1522007    3.250785
+    debt_gdp |  -3.371884   1.168936    -2.88   0.004    -5.663821   -1.079947
+       _cons |   200.2146   18.07365    11.08   0.000     164.7775    235.6517
+-------------+----------------------------------------------------------------
+     sigma_u |  85.626976
+     sigma_e |  107.14278
+         rho |  .38975933   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+F test that all u_i=0: F(92, 3204) = 32.04                   Prob > F = 0.0000
+============================================================
+SND ANNEX FE-DK MODEL 3
+============================================================
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  7,   171)     =      2.54
+maximum lag: 4                                   Prob > F          =    0.0165
+                                                 within R-squared  =    0.0454
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.195269   .7382906     1.62   0.107    -.2620674    2.652606
+real_fed_3~f |   1.227199   4.552869     0.27   0.788    -7.759864    10.21426
+real_excha~e |  -.6912654   .3461866    -2.00   0.047    -1.374615   -.0079159
+real_brazi~s |  -5.671574   2.302294    -2.46   0.015    -10.21615   -1.126998
+     gdp_yoy |    2.37908   2.837426     0.84   0.403    -3.221811    7.979971
+    debt_gdp |  -2.444626   4.130484    -0.59   0.555    -10.59793    5.708677
+sovereign_~l |  -1.132996   .4299611    -2.64   0.009    -1.981711   -.2842815
+       _cons |   217.9819   62.32117     3.50   0.001       94.964    340.9997
+------------------------------------------------------------------------------
+
+
+Fixed-effects (within) regression               Number of obs     =      3,303
+Group variable: bond_id_num                     Number of groups  =         93
+
+R-sq:                                           Obs per group:
+     within  = 0.0454                                         min =          1
+     between = 0.1784                                         avg =       35.5
+     overall = 0.1048                                         max =        143
+
+                                                F(7,3203)         =      21.75
+corr(u_i, Xb)  = 0.1648                         Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.195269   .4302819     2.78   0.006     .3516135    2.038925
+real_fed_3~f |   1.227199   1.651503     0.74   0.457     -2.01091    4.465309
+real_excha~e |  -.6912654   .1058783    -6.53   0.000    -.8988616   -.4836693
+real_brazi~s |  -5.671574   .7098292    -7.99   0.000    -7.063339   -4.279808
+     gdp_yoy |    2.37908   .8668915     2.74   0.006     .6793614    4.078798
+    debt_gdp |  -2.444626   1.164869    -2.10   0.036     -4.72859   -.1606617
+sovereign_~l |  -1.132996   .1479444    -7.66   0.000    -1.423072    -.842921
+       _cons |   217.9819   18.06282    12.07   0.000      182.566    253.3977
+-------------+----------------------------------------------------------------
+     sigma_u |  85.016755
+     sigma_e |   106.1917
+         rho |  .39059896   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+F test that all u_i=0: F(92, 3203) = 33.20                   Prob > F = 0.0000
+============================================================
+SND ANNEX FE-DK MODEL 4
+============================================================
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F( 10,   171)     =      3.24
+maximum lag: 4                                   Prob > F          =    0.0008
+                                                 within R-squared  =    0.0891
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.566124   .7218389     2.17   0.031     .1412616    2.990986
+real_fed_3~f |   -9.28112   5.669172    -1.64   0.103    -20.47169    1.909452
+real_excha~e |  -2.166978   .5627763    -3.85   0.000    -3.277861   -1.056095
+real_brazi~s |  -9.107005   2.570393    -3.54   0.001    -14.18079   -4.033218
+     gdp_yoy |  -.9623924   2.269767    -0.42   0.672    -5.442763    3.517978
+    debt_gdp |  -1.956648   3.906023    -0.50   0.617    -9.666879    5.753584
+sovereign_~l |  -1.025474   .3940613    -2.60   0.010    -1.803325   -.2476233
+book_debt_~p |   29.56659   14.79418     2.00   0.047     .3638563    58.76932
+bond_tradi~d |   12.82896   14.95879     0.86   0.392     -16.6987    42.35662
+days_to_ma~y |  -23.13557   7.203932    -3.21   0.002    -37.35565   -8.915481
+       _cons |   643.3681   143.0885     4.50   0.000     360.9207    925.8154
+------------------------------------------------------------------------------
+
+
+Fixed-effects (within) regression               Number of obs     =      3,303
+Group variable: bond_id_num                     Number of groups  =         93
+
+R-sq:                                           Obs per group:
+     within  = 0.0891                                         min =          1
+     between = 0.2124                                         avg =       35.5
+     overall = 0.1393                                         max =        143
+
+                                                F(10,3200)        =      31.31
+corr(u_i, Xb)  = -0.6794                        Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.566124   .4221651     3.71   0.000     .7383824    2.393865
+real_fed_3~f |   -9.28112   1.850505    -5.02   0.000    -12.90942   -5.652823
+real_excha~e |  -2.166978   .1658477   -13.07   0.000    -2.492156   -1.841799
+real_brazi~s |  -9.107005   .7574898   -12.02   0.000    -10.59222   -7.621791
+     gdp_yoy |  -.9623924   .9101762    -1.06   0.290     -2.74698    .8221952
+    debt_gdp |  -1.956648   1.150547    -1.70   0.089    -4.212532    .2992367
+sovereign_~l |  -1.025474   .1454025    -7.05   0.000    -1.310566   -.7403827
+book_debt_~p |   29.56659   4.861213     6.08   0.000     20.03518      39.098
+bond_tradi~d |   12.82896   9.701397     1.32   0.186    -6.192625    31.85054
+days_to_ma~y |  -23.13557   2.075269   -11.15   0.000    -27.20456   -19.06657
+       _cons |   643.3681    43.9556    14.64   0.000     557.1841     729.552
+-------------+----------------------------------------------------------------
+     sigma_u |  140.66712
+     sigma_e |  103.77828
+         rho |  .64754814   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+F test that all u_i=0: F(92, 3200) = 32.76                   Prob > F = 0.0000
+============================================================
+SND ANNEX FE-DK MODEL 5
+============================================================
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  9,   171)     =      3.14
+maximum lag: 4                                   Prob > F          =    0.0016
+                                                 within R-squared  =    0.0750
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.113004    .772351     1.44   0.151    -.4115658    2.637574
+real_fed_3~f |  -8.243779   6.227936    -1.32   0.187    -20.53731    4.049756
+real_excha~e |  -2.173825   .5988563    -3.63   0.000    -3.355928   -.9917221
+real_brazi~s |   -8.69725   2.610728    -3.33   0.001    -13.85065   -3.543846
+     gdp_yoy |  -1.737711   2.104892    -0.83   0.410    -5.892629    2.417207
+    debt_gdp |  -2.694689   4.070695    -0.66   0.509    -10.72997    5.340595
+book_debt_~p |   32.72616   15.97122     2.05   0.042     1.200027    64.25228
+bond_tradi~d |   9.123989   15.07539     0.61   0.546    -20.63383    38.88181
+days_to_ma~y |  -23.95876   7.756004    -3.09   0.002     -39.2686    -8.64892
+       _cons |   642.6566   149.2874     4.30   0.000      347.973    937.3401
+------------------------------------------------------------------------------
+
+
+Fixed-effects (within) regression               Number of obs     =      3,303
+Group variable: bond_id_num                     Number of groups  =         93
+
+R-sq:                                           Obs per group:
+     within  = 0.0750                                         min =          1
+     between = 0.2203                                         avg =       35.5
+     overall = 0.1411                                         max =        143
+
+                                                F(9,3201)         =      28.83
+corr(u_i, Xb)  = -0.6790                        Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.113004   .4204122     2.65   0.008     .2886996    1.937309
+real_fed_3~f |  -8.243779   1.858641    -4.44   0.000    -11.88803    -4.59953
+real_excha~e |  -2.173825   .1671027   -13.01   0.000    -2.501464   -1.846186
+real_brazi~s |   -8.69725   .7609866   -11.43   0.000    -10.18932   -7.205179
+     gdp_yoy |  -1.737711   .9103656    -1.91   0.056     -3.52267    .0472475
+    debt_gdp |  -2.694689   1.154468    -2.33   0.020    -4.958261   -.4311166
+book_debt_~p |   32.72616   4.877239     6.71   0.000     23.16333    42.28898
+bond_tradi~d |   9.123989   9.760636     0.93   0.350    -10.01374    28.26172
+days_to_ma~y |  -23.95876   2.087699   -11.48   0.000    -28.05212    -19.8654
+       _cons |   642.6566   44.28887    14.51   0.000     555.8192     729.494
+-------------+----------------------------------------------------------------
+     sigma_u |  137.44149
+     sigma_e |  104.56538
+         rho |  .63338623   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+F test that all u_i=0: F(92, 3201) = 31.74                   Prob > F = 0.0000
+============================================================
+SND ANNEX FE-DK MODEL 6
+============================================================
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  8,   171)     =      1.16
+maximum lag: 4                                   Prob > F          =    0.3293
+                                                 within R-squared  =    0.0372
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.246696   .8816861     1.41   0.159    -.4936942    2.987086
+real_fed_3~f |  -8.819101     6.7572    -1.31   0.194    -22.15737    4.519165
+real_excha~e |  -1.585941   .6901994    -2.30   0.023    -2.948349   -.2235327
+     gdp_yoy |   .9689637    2.78527     0.35   0.728    -4.528976    6.466904
+    debt_gdp |  -6.110663   4.190647    -1.46   0.147    -14.38272    2.161398
+book_debt_~p |    16.7046   15.34439     1.09   0.278    -13.58421    46.99342
+bond_tradi~d |    20.5692   16.82527     1.22   0.223    -12.64278    53.78118
+days_to_ma~y |  -15.48771   8.934383    -1.73   0.085    -33.12359    2.148171
+       _cons |   398.7014   163.0193     2.45   0.015     76.91219    720.4907
+------------------------------------------------------------------------------
+
+
+Fixed-effects (within) regression               Number of obs     =      3,303
+Group variable: bond_id_num                     Number of groups  =         93
+
+R-sq:                                           Obs per group:
+     within  = 0.0372                                         min =          1
+     between = 0.1987                                         avg =       35.5
+     overall = 0.1237                                         max =        143
+
+                                                F(8,3202)         =      15.48
+corr(u_i, Xb)  = -0.3489                        Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.246696   .4286711     2.91   0.004     .4061982    2.087193
+real_fed_3~f |  -8.819101   1.895193    -4.65   0.000    -12.53501   -5.103187
+real_excha~e |  -1.585941   .1621748    -9.78   0.000    -1.903918   -1.267964
+     gdp_yoy |   .9689637   .8966366     1.08   0.280    -.7890763    2.727004
+    debt_gdp |  -6.110663   1.137453    -5.37   0.000    -8.340873   -3.880453
+book_debt_~p |    16.7046   4.765048     3.51   0.000     7.361747    26.04746
+bond_tradi~d |    20.5692   9.903695     2.08   0.038     1.150973    39.98742
+days_to_ma~y |  -15.48771   1.990808    -7.78   0.000     -19.3911   -11.58432
+       _cons |   398.7014   39.58327    10.07   0.000     321.0903    476.3126
+-------------+----------------------------------------------------------------
+     sigma_u |  97.428483
+     sigma_e |  106.66084
+         rho |  .45485553   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+F test that all u_i=0: F(92, 3202) = 30.58                   Prob > F = 0.0000
+============================================================
+SND ANNEX FE-DK MODEL 7
+============================================================
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F(  3,   171)     =      1.63
+maximum lag: 4                                   Prob > F          =    0.1835
+                                                 within R-squared  =    0.0131
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |  -.2471449   .9121217    -0.27   0.787    -2.047613    1.553323
+real_fed_3~f |  -1.217472   4.467713    -0.27   0.786    -10.03644      7.6015
+sovereign_~l |  -.8960298   .4049237    -2.21   0.028    -1.695322   -.0967373
+       _cons |    100.285   19.69851     5.09   0.000     61.40148    139.1686
+------------------------------------------------------------------------------
+
+
+Fixed-effects (within) regression               Number of obs     =      3,303
+Group variable: bond_id_num                     Number of groups  =         93
+
+R-sq:                                           Obs per group:
+     within  = 0.0131                                         min =          1
+     between = 0.0349                                         avg =       35.5
+     overall = 0.0076                                         max =        143
+
+                                                F(3,3207)         =      14.16
+corr(u_i, Xb)  = 0.0005                         Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |  -.2471449   .3563559    -0.69   0.488    -.9458533    .4515636
+real_fed_3~f |  -1.217472   1.555312    -0.78   0.434    -4.266978    1.832035
+sovereign_~l |  -.8960298   .1444125    -6.20   0.000     -1.17918   -.6128796
+       _cons |    100.285    6.71851    14.93   0.000     87.11202     113.458
+-------------+----------------------------------------------------------------
+     sigma_u |  91.743587
+     sigma_e |  107.90658
+         rho |  .41957056   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+F test that all u_i=0: F(92, 3207) = 36.52                   Prob > F = 0.0000
+============================================================
+SND ANNEX FE-DK MODEL 8
+============================================================
+
+Regression with Driscoll-Kraay standard errors   Number of obs     =      3303
+Method: Fixed-effects regression                 Number of groups  =        93
+Group variable (i): bond_id_num                  F( 11,   171)     =      3.06
+maximum lag: 4                                   Prob > F          =    0.0009
+                                                 within R-squared  =    0.0934
+
+------------------------------------------------------------------------------
+             |             Drisc/Kraay
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.507164   .7161343     2.10   0.037     .0935624    2.920766
+real_fed_3~f |  -9.064709   5.708708    -1.59   0.114    -20.33332    2.203903
+real_excha~e |  -2.106334   .5516035    -3.82   0.000    -3.195162   -1.017505
+real_brazi~s |  -9.373471   2.618965    -3.58   0.000    -14.54313   -4.203807
+     gdp_yoy |  -.6281534   2.275557    -0.28   0.783    -5.119954    3.863647
+    debt_gdp |  -1.993119   3.906824    -0.51   0.611    -9.704932    5.718695
+sovereign_~l |  -1.006091   .3930076    -2.56   0.011    -1.781862   -.2303196
+book_debt_~p |   27.47469   14.33229     1.92   0.057    -.8163005    55.76567
+bond_tradi~d |   11.66792   15.03241     0.78   0.439    -18.00507     41.3409
+cf_cash_op~t |  -.4068271   .2633621    -1.54   0.124    -.9266865    .1130323
+days_to_ma~y |  -22.91695   7.145195    -3.21   0.002     -37.0211   -8.812809
+       _cons |   643.1882   142.1166     4.53   0.000     362.6593     923.717
+------------------------------------------------------------------------------
+
+
+Fixed-effects (within) regression               Number of obs     =      3,303
+Group variable: bond_id_num                     Number of groups  =         93
+
+R-sq:                                           Obs per group:
+     within  = 0.0934                                         min =          1
+     between = 0.2176                                         avg =       35.5
+     overall = 0.1449                                         max =        143
+
+                                                F(11,3199)        =      29.97
+corr(u_i, Xb)  = -0.6693                        Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+      spread |      Coef.   Std. Err.      t    P>|t|     [95% Conf. Interval]
+-------------+----------------------------------------------------------------
+         vix |   1.507164    .421508     3.58   0.000     .6807111    2.333617
+real_fed_3~f |  -9.064709   1.847268    -4.91   0.000    -12.68666   -5.442759
+real_excha~e |  -2.106334   .1662148   -12.67   0.000    -2.432232   -1.780435
+real_brazi~s |  -9.373471    .758918   -12.35   0.000    -10.86149   -7.885456
+     gdp_yoy |  -.6281534   .9122256    -0.69   0.491    -2.416759    1.160453
+    debt_gdp |  -1.993119   1.148052    -1.74   0.083    -4.244111    .2578732
+sovereign_~l |  -1.006091   .1451679    -6.93   0.000    -1.290722   -.7214591
+book_debt_~p |   27.47469   4.880214     5.63   0.000     17.90602    37.04335
+bond_tradi~d |   11.66792   9.684633     1.20   0.228      -7.3208    30.65663
+cf_cash_op~t |  -.4068271   .1045574    -3.89   0.000    -.6118334   -.2018208
+days_to_ma~y |  -22.91695   2.071462   -11.06   0.000    -26.97848   -18.85543
+       _cons |   643.1882   43.85884    14.66   0.000     557.1939    729.1825
+-------------+----------------------------------------------------------------
+     sigma_u |  138.56539
+     sigma_e |  103.54976
+         rho |  .64166089   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+F test that all u_i=0: F(92, 3199) = 31.49                   Prob > F = 0.0000
+
+. 
+. *============================================================================
+> ===
+. * 15. SIDE-BY-SIDE VALIDATION
+. *============================================================================
+> ===
+. 
+. estimates table M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK M7_DK M8_DK, ///
+>     b(%9.4f) se(%9.4f) stats(N r2_w)
+
+--------------------------------------------------------------------------
+    Variable |   M1_DK       M2_DK       M3_DK       M4_DK       M5_DK    
+-------------+------------------------------------------------------------
+         vix |   -0.5891      0.6730      1.1953      1.5661      1.1130  
+             |    1.0274      0.7627      0.7383      0.7218      0.7724  
+real_fed_3~f |    0.4295      2.6416      1.2272     -9.2811     -8.2438  
+             |    4.4545      4.8252      4.5529      5.6692      6.2279  
+real_excha~e |               -0.6480     -0.6913     -2.1670     -2.1738  
+             |                0.3534      0.3462      0.5628      0.5989  
+real_brazi~s |               -4.9985     -5.6716     -9.1070     -8.6972  
+             |                2.3741      2.3023      2.5704      2.6107  
+     gdp_yoy |                1.5493      2.3791     -0.9624     -1.7377  
+             |                2.7302      2.8374      2.2698      2.1049  
+    debt_gdp |               -3.3719     -2.4446     -1.9566     -2.6947  
+             |                4.5092      4.1305      3.9060      4.0707  
+sovereign_~l |                           -1.1330     -1.0255              
+             |                            0.4300      0.3941              
+book_debt_~p |                                       29.5666     32.7262  
+             |                                       14.7942     15.9712  
+bond_tradi~d |                                       12.8290      9.1240  
+             |                                       14.9588     15.0754  
+days_to_ma~y |                                      -23.1356    -23.9588  
+             |                                        7.2039      7.7560  
+cf_cash_op~t |                                                            
+             |                                                            
+       _cons |   98.6595    200.2146    217.9819    643.3681    642.6566  
+             |   20.9322     62.7856     62.3212    143.0885    149.2874  
+-------------+------------------------------------------------------------
+           N |      3303        3303        3303        3303        3303  
+        r2_w |    0.0012      0.0279      0.0454      0.0891      0.0750  
+--------------------------------------------------------------------------
+                                                              legend: b/se
+
+
+--------------------------------------------------
+    Variable |   M6_DK       M7_DK       M8_DK    
+-------------+------------------------------------
+         vix |    1.2467     -0.2471      1.5072  
+             |    0.8817      0.9121      0.7161  
+real_fed_3~f |   -8.8191     -1.2175     -9.0647  
+             |    6.7572      4.4677      5.7087  
+real_excha~e |   -1.5859                 -2.1063  
+             |    0.6902                  0.5516  
+real_brazi~s |                           -9.3735  
+             |                            2.6190  
+     gdp_yoy |    0.9690                 -0.6282  
+             |    2.7853                  2.2756  
+    debt_gdp |   -6.1107                 -1.9931  
+             |    4.1906                  3.9068  
+sovereign_~l |               -0.8960     -1.0061  
+             |                0.4049      0.3930  
+book_debt_~p |   16.7046                 27.4747  
+             |   15.3444                 14.3323  
+bond_tradi~d |   20.5692                 11.6679  
+             |   16.8253                 15.0324  
+days_to_ma~y |  -15.4877                -22.9170  
+             |    8.9344                  7.1452  
+cf_cash_op~t |                           -0.4068  
+             |                            0.2634  
+       _cons |  398.7014    100.2850    643.1882  
+             |  163.0193     19.6985    142.1166  
+-------------+------------------------------------
+           N |      3303        3303        3303  
+        r2_w |    0.0372      0.0131      0.0934  
+--------------------------------------------------
+                                      legend: b/se
+
+. 
+. *============================================================================
+> ===
+. * 16. FINAL TABLE EXPORT
+. *============================================================================
+> ===
+. 
+. local table_keep ///
+>     vix ///
+>     real_fed_3m_spf ///
+>     real_exchange_rate ///
+>     real_brazil_3m_focus ///
+>     gdp_yoy ///
+>     debt_gdp ///
+>     sovereign_spread_brl ///
+>     book_debt_to_market_cap ///
+>     bond_trading_day_share_snd ///
+>     cf_cash_oper_to_tot_asset ///
+>     days_to_maturity
+
+. 
+. local table_options ///
+>     keep(`table_keep') ///
+>     varlabels(vix "VIX" ///
+>               real_fed_3m_spf "Real Fed 3M forward" ///
+>               real_exchange_rate "Real USD/BRL index" ///
+>               real_brazil_3m_focus "Real Brazil 3M rate" ///
+>               gdp_yoy "GDP growth (YoY)" ///
+>               debt_gdp "Fiscal balance (% of GDP)" ///
+>               sovereign_spread_brl "Sovereign risk (BRL)" ///
+>               book_debt_to_market_cap "Book debt / equity market cap" ///
+>               bond_trading_day_share_snd "Historical SND trading-day share" /
+> //
+>               cf_cash_oper_to_tot_asset "Operating cash flow / total assets" 
+> ///
+>               days_to_maturity "Residual maturity (years, BUS/252)") ///
+>     mtitles("M1: Global" ///
+>             "M2: Local macro" ///
+>             "M3: + Sovereign" ///
+>             "M4: Full" ///
+>             "M5: Full 2 - no Sov Risk" ///
+>             "M6: Full 3 - no Sov Risk / no Brazil 3M" ///
+>             "M7: Parsimonious" ///
+>             "M8: Full + OCF/assets") ///
+>     b(4) se(4) ///
+>     stats(N r2_w N_g rho, ///
+>           fmt(0 4 0 4) ///
+>           labels("Observations" ///
+>                  "Within R-squared" ///
+>                  "Number of bonds" ///
+>                  "rho")) ///
+>     star(* 0.10 ** 0.05 *** 0.01) ///
+>     nocons nonotes ///
+>     addnotes("Bond fixed effects in all specifications." ///
+>              "Driscoll-Kraay standard errors with maximum lag 4." ///
+>              "All columns use the same 3,303-observation sample (93 bonds; 44
+>  issuers)." ///
+>              "Common-sample window: March 2011 to June 2025." ///
+>              "Real Fed 3M uses SPF expected inflation." ///
+>              "Real Brazil 3M uses Focus expected IPCA." ///
+>              "RER is the bilateral USD/BRL CPI-based real exchange-rate index
+> ." ///
+>              "Fiscal balance is the EHBBBR quarterly seasonally adjusted seri
+> es." ///
+>              "M4 adds book debt / equity market cap, historical SND trading-d
+> ay share, and maturity." ///
+>              "M5 removes sovereign risk from M4." ///
+>              "M6 additionally removes the Real Brazil 3M rate." ///
+>              "M7 is the parsimonious VIX + Real Fed 3M + sovereign-risk speci
+> fication." ///
+>              "M8 adds OCF/assets to M4." ///
+>              "Historical SND liquidity is an annex robustness variable; WP-12
+> A remains the preferred main table." ///
+>              "* p<0.10, ** p<0.05, *** p<0.01")
+
+. 
+. esttab M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK M7_DK M8_DK using ///
+>     "`root'\src\econometrics\wp12b_reestimation\WP12B_SND_Liquidity_Annex_M1_
+> M8_FE_DK.txt", ///
+>     replace `table_options'
+(note: file C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\econome
+> trics\wp12b_reestimation\WP12B_SND_Liquidity_Annex_M1_M8_FE_DK.txt not found)
+(output written to C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\
+> econometrics\wp12b_reestimation\WP12B_SND_Liquidity_Annex_M1_M8_FE_DK.txt)
+
+. 
+. esttab M1_DK M2_DK M3_DK M4_DK M5_DK M6_DK M7_DK M8_DK using ///
+>     "`root'\src\econometrics\wp12b_reestimation\WP12B_SND_Liquidity_Annex_M1_
+> M8_FE_DK.rtf", ///
+>     replace rtf `table_options'
+(note: file C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\econome
+> trics\wp12b_reestimation\WP12B_SND_Liquidity_Annex_M1_M8_FE_DK.rtf not found)
+(output written to C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\
+> econometrics\wp12b_reestimation\WP12B_SND_Liquidity_Annex_M1_M8_FE_DK.rtf)
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as result "WP-12B HISTORICAL SND LIQUIDITY ANNEX COMPLETED"
+WP-12B HISTORICAL SND LIQUIDITY ANNEX COMPLETED
+
+. di as result "Common sample: 3,303 observations / 93 bonds / 44 issuers"
+Common sample: 3,303 observations / 93 bonds / 44 issuers
+
+. di as result "Window: 2011m3-2025m6"
+Window: 2011m3-2025m6
+
+. di as result "DK maximum lag: 4"
+DK maximum lag: 4
+
+. di as text "============================================================"
+============================================================
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\tsiqueira4\PycharmProjects\tmf_thiago_siqueira\src\econom
+> etrics\wp12b_reestimation\WP12B_SND_Liquidity_Annex_FE_DK.log
+  log type:  text
+ closed on:  26 Oct 2026, 20:05:27
+-------------------------------------------------------------------------------

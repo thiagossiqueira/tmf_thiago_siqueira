@@ -1,0 +1,32 @@
+﻿{% extends "shared/base.html" %}
+
+{% block title %}{{ artifact.label }} | Modelo de Spreads{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">Artefacto econométrico</p>
+  <h1>{{ artifact.label }}</h1>
+  <p class="meta"><code>{{ artifact.path }}</code></p>
+</section>
+
+<section class="dashboard-section">
+  <div class="card full">
+    <div class="section-heading">
+      <div>
+        <h2>Contenido</h2>
+        <p>Visualización de solo lectura del archivo congelado.</p>
+      </div>
+
+      <a href="{{ url_for('artifact_download', key=artifact_key) }}">
+        Descargar archivo ↓
+      </a>
+    </div>
+
+    <pre>{{ content }}</pre>
+  </div>
+</section>
+
+<footer class="footer">
+  <a href="{{ url_for('econometrics') }}">← Volver a Econometría / Stata</a>
+</footer>
+{% endblock %}

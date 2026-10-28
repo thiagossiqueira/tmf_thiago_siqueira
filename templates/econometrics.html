@@ -1,0 +1,101 @@
+﻿{% extends "shared/base.html" %}
+
+{% block title %}Econometría / Stata | Modelo de Spreads{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">Resultados econométricos congelados</p>
+  <h1>Econometría / Stata</h1>
+  <p>
+    Esta sección reúne los inputs, scripts, tablas, logs y auditorías utilizados
+    en la especificación final y en las principales pruebas de robustez.
+  </p>
+  <p class="meta">
+    Jerarquía de evidencia: WP-12C principal · WP-12A Anexo A · WP-12B Anexo B · WP-07 diagnóstico DK.
+  </p>
+</section>
+
+<section class="dashboard-section">
+  <div class="callout">
+    Los archivos aquí expuestos son artefactos ya generados y congelados.
+    Esta interfaz no reestima modelos ni modifica los datos.
+  </div>
+</section>
+
+{% set groups = ["Principal", "Anexo A", "Anexo B", "Diagnósticos", "Inputs"] %}
+
+{% for group in groups %}
+<section class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>{{ group }}</h2>
+      {% if group == "Principal" %}
+        <p>WP-12C — especificación M1–M8 utilizada como tabla principal.</p>
+      {% elif group == "Anexo A" %}
+        <p>WP-12A — robustez de la especificación de leverage.</p>
+      {% elif group == "Anexo B" %}
+        <p>WP-12B — robustez de liquidez del bono basada en SND.</p>
+      {% elif group == "Diagnósticos" %}
+        <p>Pruebas de sensibilidad del bandwidth Driscoll–Kraay.</p>
+      {% else %}
+        <p>Datos de entrada congelados utilizados por la capa econométrica.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card-grid">
+    {% for item in artifacts if item.group == group %}
+      <article class="card wide">
+        <h3>{{ item.label }}</h3>
+
+        <p><code>{{ item.path }}</code></p>
+
+        {% if item.exists %}
+          <p>
+            <span class="badge ok">Disponible</span>
+            {% if group == "Principal" %}
+              <span class="badge main">Principal</span>
+            {% elif group in ["Anexo A", "Anexo B"] %}
+              <span class="badge annex">{{ group }}</span>
+            {% endif %}
+          </p>
+
+          <ul class="link-list">
+            {% if (not public_deployment or item.key not in ["panel_input", "wp12c_leverage_csv"])
+               and (item.path.endswith(".txt")
+               or item.path.endswith(".log")
+               or item.path.endswith(".do")
+               or item.path.endswith(".csv")) %}
+            <li>
+              <a href="{{ url_for('artifact_view', key=item.key) }}">
+                Ver en el navegador
+                <span>→</span>
+              </a>
+            </li>
+            {% endif %}
+
+            {% if not public_deployment or item.key not in ["panel_input", "wp12c_leverage_csv"] %}
+<li>
+              <a href="{{ url_for('artifact_download', key=item.key) }}">
+                Descargar archivo
+                <span>↓</span>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        {% else %}
+          <p><span class="badge warn">No encontrado</span></p>
+          <p>
+            El archivo figura en el inventario, pero no está disponible en la ruta esperada.
+          </p>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+
+<footer class="footer">
+  Tesis de Maestría en Economía · Brasil · Panel mensual 2010–2025
+</footer>
+{% endblock %}

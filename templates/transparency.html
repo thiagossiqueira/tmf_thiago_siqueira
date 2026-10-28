@@ -1,0 +1,358 @@
+﻿{% extends "shared/base.html" %}
+
+{% block title %}Transparencia y trazabilidad | Modelo de Spreads{% endblock %}
+
+{% block head %}
+<style>
+  .transparency-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .transparency-stat {
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .transparency-stat strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 1.35rem;
+  }
+
+  .figure-card {
+    grid-column: span 6;
+  }
+
+  .figure-frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    margin: 12px 0;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #ffffff;
+  }
+
+  .figure-frame img {
+    display: block;
+    width: 100%;
+    max-height: 560px;
+    object-fit: contain;
+  }
+
+  .figure-source {
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  .variable-card {
+    grid-column: 1 / -1;
+  }
+
+  .variable-card h3 {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .method-box {
+    margin: 10px 0 14px;
+    padding: 11px 13px;
+    border-left: 4px solid var(--accent);
+    border-radius: 7px;
+    background: var(--accent-soft);
+    font-size: 0.9rem;
+  }
+
+  .path-code {
+    font-family: Consolas, monospace;
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
+  }
+
+  .hash-code {
+    font-family: Consolas, monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+
+  .policy-note {
+    padding: 13px 15px;
+    border: 1px solid #f0d58c;
+    border-radius: 10px;
+    background: #fff8e1;
+  }
+
+  @media (max-width: 900px) {
+    .figure-card {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="hero">
+  <p class="eyebrow">Auditoría y reproducibilidad</p>
+  <h1>Transparencia de datos, variables y figuras</h1>
+
+  <p>
+    Esta sección documenta la procedencia de las variables utilizadas en el
+    panel econométrico final y reúne las figuras incorporadas en la versión
+    de la tesis utilizada como fuente del inventario.
+  </p>
+
+  <p class="meta">
+    La trazabilidad se construye sobre archivos y scripts congelados.
+    El dashboard no reestima modelos al abrir esta página.
+  </p>
+
+  <div class="transparency-stats">
+    <div class="transparency-stat">
+      Variables documentadas
+      <strong>{{ variables|length }}</strong>
+    </div>
+
+    <div class="transparency-stat">
+      Figuras de la tesis
+      <strong>{{ figures|length }}</strong>
+    </div>
+
+    <div class="transparency-stat">
+      Panel final
+      <strong>4.648 obs.</strong>
+    </div>
+
+    <div class="transparency-stat">
+      Bonos / emisores
+      <strong>103 / 48</strong>
+    </div>
+  </div>
+</section>
+
+
+<section class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>Panel econométrico final</h2>
+      <p>Archivo congelado utilizado como referencia del dashboard.</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <article class="card full">
+      <table>
+        <tbody>
+          <tr>
+            <th>Archivo</th>
+            <td class="path-code">{{ final_panel.path }}</td>
+          </tr>
+          <tr>
+            <th>Existe</th>
+            <td>
+              {% if final_panel.exists %}
+                <span class="badge ok">Sí</span>
+              {% else %}
+                <span class="badge warn">No</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th>SHA-256</th>
+            <td class="hash-code">{{ final_panel.sha256 }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        El archivo legacy <code>panel_main_and_robustness.xlsx</code> se
+        conserva únicamente para trazabilidad histórica; no se presenta
+        como panel econométrico final.
+      </p>
+    </article>
+  </div>
+</section>
+
+
+<section id="variables" class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>Provenance por variable</h2>
+      <p>
+        Fuente, transformación y código de construcción de cada campo del
+        panel final.
+      </p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    {% for variable in variables %}
+    <article class="card variable-card">
+      <h3>
+        {{ variable.label }}
+        <span class="badge main">{{ variable.variable }}</span>
+        <span class="badge annex">{{ variable.role }}</span>
+      </h3>
+
+      <p>{{ variable.description }}</p>
+
+      <div class="method-box">
+        <strong>Construcción:</strong>
+        {{ variable.transformation }}
+      </div>
+
+      {% if variable.variable == "spread" %}
+      <p>
+        <a href="{{ url_for('spread_transparency') }}">
+          Abrir auditoría completa de la variable dependiente →
+        </a>
+      </p>
+      {% endif %}
+
+      <h4>Archivos fuente</h4>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ruta</th>
+              <th>Estado</th>
+              <th>Exposición pública</th>
+              <th>SHA-256</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for source in variable.sources %}
+            <tr>
+              <td class="path-code">{{ source.path }}</td>
+              <td>
+                {% if source.exists %}
+                  <span class="badge ok">Disponible</span>
+                {% else %}
+                  <span class="badge warn">Faltante</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if source.public_safe %}
+                  <span class="badge ok">Public-safe</span>
+                {% else %}
+                  <span class="badge warn">Restringido</span>
+                {% endif %}
+              </td>
+              <td class="hash-code">
+                {{ source.sha256[:16] if source.sha256 else "—" }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Código de construcción</h4>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Script</th>
+              <th>Estado</th>
+              <th>SHA-256</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for code in variable.code %}
+            <tr>
+              <td class="path-code">{{ code.path }}</td>
+              <td>
+                {% if code.exists %}
+                  <span class="badge ok">Disponible</span>
+                {% else %}
+                  <span class="badge warn">Faltante</span>
+                {% endif %}
+              </td>
+              <td class="hash-code">
+                {{ code.sha256[:16] if code.sha256 else "—" }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+
+<section id="figuras" class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>Figuras incorporadas en la tesis</h2>
+      <p>
+        Imágenes extraídas directamente del DOCX de referencia y acompañadas
+        por sus captions y fuentes.
+      </p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    {% for figure in figures %}
+    <article class="card figure-card">
+      <h3>{{ figure.caption }}</h3>
+
+      <div class="figure-frame">
+        <img
+          src="{{ url_for('static', filename=figure.static_file) }}"
+          alt="{{ figure.caption }}"
+          loading="lazy"
+        >
+      </div>
+
+      <p class="figure-source">{{ figure.source }}</p>
+
+      <p class="hash-code">
+        SHA-256: {{ figure.sha256[:16] }}…
+      </p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+
+<section class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>Política de publicación</h2>
+      <p>Separación entre trazabilidad metodológica y distribución de datos.</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <article class="card full">
+      <div class="policy-note">
+        Los archivos fuente derivados de Bloomberg se muestran aquí como
+        referencias de auditoría, pero no deben exponerse automáticamente
+        para descarga en un despliegue público. Los scripts, manifests y
+        archivos derivados deben habilitarse por separado según su condición
+        de publicación.
+      </div>
+    </article>
+  </div>
+</section>
+
+
+<footer class="footer">
+  Tesis de Maestría en Economía · FCE-UBA · Brasil · 2010–2025
+</footer>
+
+{% endblock %}

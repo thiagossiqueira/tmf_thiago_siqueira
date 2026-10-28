@@ -1,81 +1,623 @@
-{% extends "shared/base.html" %}
+﻿{% extends "shared/base.html" %}
 
-{% block title %}Home | Modelo de Spreads{% endblock %}
-
-{% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
-{% endblock %}
+{% block title %}Dashboard de la tesis | Modelo de Spreads{% endblock %}
 
 {% block content %}
 <section class="hero">
-  <p class="subtitle">1993–2025 · Brasil · Deuda corporativa en BRL</p>
-  <h1>Modelo de spreads de bonos corporativos</h1>
+  <p class="eyebrow">Tesis de Maestría en Economía · FCE-UBA</p>
+  <h1>Determinantes de los spreads de bonos corporativos en moneda local en Brasil</h1>
+
+  <p>
+    Panel mensual 2010–2025 de bonos corporativos domésticos denominados en BRL,
+    con énfasis en instrumentos indexados al IPCA.
+  </p>
+
+  <p class="meta">
+    Muestra final: 48 empresas · 103 bonos · 4.648 observaciones econométricas.
+    Este dashboard reúne construcción de curvas, spreads, resultados econométricos
+    y archivos de reproducibilidad.
+  </p>
 </section>
 
-<main>
-  <div class="grid">
-    <article class="card span-7">
-      <h3>Resumen del estudio</h3>
+
+<section id="muestra" class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>1. Muestra y universo</h2>
+      <p>Universo de bonos, filtros y panel utilizado en la investigación.</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <article class="card">
+      <h3>Panel econométrico final</h3>
       <p>
-        Este trabajo analiza los <strong>determinantes de los spreads de deuda corporativa</strong> en Brasil entre 1993 y 2025,
-        enfocado en el mercado local en reales. El spread se define como la diferencia entre el
-        <em>yield to maturity</em> del bono corporativo y el rendimento de uma referência soberana ou livre de risco de igual prazo.
+        Panel mensual utilizado para la especificación principal y las pruebas de robustez.
       </p>
-      <p class="muted">
-        Los spreads reflejan prima por riesgo de default, iliquidez y otros factores idiosincráticos, además de componentes
-        sistémicos propios de economías emergentes: riesgo soberano, condiciones financieras globales y el entorno macro
-        doméstico.
+
+      <ul class="link-list">
+        {% if status.panel_input and not public_deployment %}
+        <li>
+          <a href="{{ url_for('artifact_download', key='panel_input') }}">
+            Descargar panel congelado
+            <span>↓</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Panel congelado
+            <span>No disponible</span>
+          </span>
+        </li>
+        {% endif %}
+
+        <li>
+          <a href="{{ url_for('econometrics') }}">
+            Ver trazabilidad econométrica
+            <span>→</span>
+          </a>
+        </li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <h3>Resumen del universo corporativo</h3>
+      <p>
+        Información descriptiva de emisiones y emisores utilizada en la construcción
+        de la base.
+      </p>
+
+      <ul class="link-list">
+        {% if status.corp_summary %}
+        <li>
+          <a href="{{ url_for('summary_full') }}">
+            Abrir resumen completo
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Resumen corporativo
+            <span>No disponible</span>
+          </span>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+
+    <article class="card">
+      <h3>Selección de la muestra</h3>
+      <p>
+        La especificación final se concentra en bonos corporativos domésticos
+        indexados al IPCA. Los instrumentos DI quedan como material de procedencia
+        y validación, no como núcleo de la tabla econométrica final.
+      </p>
+
+      <p>
+        <span class="badge main">Muestra principal IPCA</span>
+      </p>
+    </article>
+  </div>
+</section>
+
+
+<section id="benchmarks" class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>2. Benchmarks libres de riesgo</h2>
+      <p>Construcción de las curvas utilizadas para calcular los spreads corporativos.</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <article class="card wide">
+      <h3>Curva real IPCA · WLA + NTN-B</h3>
+      <p>
+        Curva histórica combinada utilizada como referencia real:
+        WLA en el tramo corto y NTN-B en el tramo largo.
+      </p>
+
+      <p>
+        {% if status.wla_ntnb_surface %}
+          <span class="badge ok">Disponible</span>
+          <span class="badge main">Benchmark principal</span>
+        {% else %}
+          <span class="badge warn">No disponible</span>
+        {% endif %}
+      </p>
+
+      <ul class="link-list">
+        {% if status.wla_ntnb_surface %}
+        <li>
+          <a href="{{ url_for('surface', tipo='wla_ntnb') }}">
+            Superficie histórica interactiva 3D
+            <span>→</span>
+          </a>
+        </li>
+        {% endif %}
+
+        {% if status.wla_ntnb_data and not public_deployment %}
+        <li>
+          <a href="{{ url_for('data_wla_ntnb') }}">
+            Inspeccionar datos de la superficie
+            <span>→</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+
+    <article class="card wide">
+      <h3>Curva nominal DI</h3>
+      <p>
+        Curva nominal conservada como parte de la construcción histórica,
+        validación y procedencia metodológica.
+      </p>
+
+      <ul class="link-list">
+        {% if status.di_surface %}
+        <li>
+          <a href="{{ url_for('surface', tipo='di') }}">
+            Superficie DI
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Superficie DI
+            <span>Artefacto no generado</span>
+          </span>
+        </li>
+        {% endif %}
+
+        {% if status.summary_di %}
+        <li>
+          <a href="{{ url_for('summary', prefixo='di') }}">
+            Tabla de la curva DI
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Tabla de la curva DI
+            <span>No disponible</span>
+          </span>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+  </div>
+</section>
+
+
+<section id="soberano" class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>3. Soberano y riesgo Brasil</h2>
+      <p>Curvas soberanas en BRL y matching por tenor e indexación.</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <article class="card">
+      <h3>Benchmark soberano consolidado</h3>
+      <p>
+        Resumen de los instrumentos soberanos utilizados en la construcción
+        de las curvas nominal y real.
+      </p>
+
+      <ul class="link-list">
+        {% if status.sov_benchmark_summary %}
+        <li>
+          <a href="{{ url_for('sov_benchmark_summary') }}">
+            Abrir resumen soberano
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Resumen soberano
+            <span>No disponible</span>
+          </span>
+        </li>
+        {% endif %}
+
+        {% if not public_deployment %}
+<li>
+          <a href="{{ url_for('download_govt_all') }}">
+            Descargar consolidado soberano
+            <span>↓</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+
+    <article class="card">
+      <h3>Curva soberana real</h3>
+      <p>NTN-B y referencias reales utilizadas para el matching por tenor.</p>
+
+      <ul class="link-list">
+        {% if status.sov_ipca_surface %}
+        <li>
+          <a href="{{ url_for('sov_surface', prefixo='ipca') }}">
+            Superficie soberana real
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Superficie soberana real
+            <span>Artefacto no generado</span>
+          </span>
+        </li>
+        {% endif %}
+
+        {% if status.sov_ipca_spread %}
+        <li>
+          <a href="{{ url_for('sov_spread', prefixo='ipca') }}">
+            Spread soberano real
+            <span>→</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+
+    <article class="card">
+      <h3>Spread soberano BRL por tenor</h3>
+      <p>
+        Medida de riesgo soberano construida en moneda local y emparejada por tenor.
+        No se interpreta como un CDS contractual.
+      </p>
+
+      <ul class="link-list">
+        {% if status.brl_risk_surface %}
+        <li>
+          <a href="{{ url_for('brl_risk_surface') }}">
+            Superficie del spread soberano BRL
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Superficie del spread soberano BRL
+            <span>No disponible</span>
+          </span>
+        </li>
+        {% endif %}
+
+        {% if status.brl_risk_table %}
+        <li>
+          <a href="{{ url_for('brl_risk_table') }}">
+            Tabla del spread soberano BRL
+            <span>→</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+  </div>
+</section>
+
+
+<section id="spreads" class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>4. Spreads corporativos</h2>
+      <p>Spread geométrico entre la YTM corporativa y el benchmark real emparejado a la madurez residual exacta.</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <article class="card wide">
+      <h3>Bonos IPCA</h3>
+      <p>
+        Componente central de la investigación empírica y del panel econométrico final.
+      </p>
+
+      <ul class="link-list">
+        {% if status.spread_ipca_surface %}
+        <li>
+          <a href="{{ url_for('spread', prefixo='ipca') }}">
+            Superficie de spreads IPCA
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Superficie de spreads IPCA
+            <span>Artefacto no generado</span>
+          </span>
+        </li>
+        {% endif %}
+
+        {% if status.spread_ipca_table %}
+        <li>
+          <a href="{{ url_for('spread_table', prefixo='ipca') }}">
+            Tabla de spreads IPCA
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Tabla de spreads IPCA
+            <span>No disponible</span>
+          </span>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+
+    <article class="card wide">
+      <h3>Bonos DI · procedencia</h3>
+      <p>
+        Resultados históricos conservados para trazabilidad. No constituyen
+        la muestra principal de la especificación final.
+      </p>
+
+      <ul class="link-list">
+        {% if status.spread_di_surface %}
+        <li>
+          <a href="{{ url_for('spread', prefixo='di') }}">
+            Superficie de spreads DI
+            <span>→</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Superficie de spreads DI
+            <span>Artefacto no generado</span>
+          </span>
+        </li>
+        {% endif %}
+
+        {% if status.spread_di_table %}
+        <li>
+          <a href="{{ url_for('spread_table', prefixo='di') }}">
+            Tabla de spreads DI
+            <span>→</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+
+    <article class="card wide">
+      <h3>Variable dependiente · datos y auditoría</h3>
+      <p>
+        Reconstrucción exacta de las 4.648 observaciones del spread utilizadas
+        en el panel econométrico final, con YTM corporativa, benchmark real,
+        madurez residual, fuente de cotización y controles de procedencia.
+      </p>
+
+      <ul class="link-list">
+        <li>
+          <a href="{{ url_for('spread_transparency') }}">
+            Explorar variable dependiente y backing data
+            <span>→</span>
+          </a>
+        </li>
+        {% if not public_deployment %}
+<li>
+          <a href="{{ url_for('spread_transparency_download') }}">
+            Descargar backing data final (.xlsx)
+            <span>↓</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+  </div>
+</section>
+
+
+<section id="econometria" class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>5. Econometría / Stata</h2>
+      <p>Resultados congelados, scripts, logs, auditorías e inputs.</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <article class="card">
+      <h3>WP-12C · Tabla principal M1–M8</h3>
+      <p>
+        Especificación principal con errores Driscoll–Kraay y
+        Total Debt / Total Assets como proxy de leverage.
+      </p>
+
+      <p>
+        <span class="badge main">Principal</span>
+      </p>
+
+      <ul class="link-list">
+        <li>
+          <a href="{{ url_for('artifact_view', key='wp12c_table') }}">
+            Ver tabla final
+            <span>→</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('artifact_view', key='wp12c_do') }}">
+            Ver código Stata
+            <span>→</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('artifact_view', key='wp12c_log') }}">
+            Ver log de estimación
+            <span>→</span>
+          </a>
+        </li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <h3>WP-12A · Anexo A</h3>
+      <p>Robustez asociada a la especificación de leverage.</p>
+
+      <p>
+        <span class="badge annex">Anexo A</span>
+      </p>
+
+      <ul class="link-list">
+        <li>
+          <a href="{{ url_for('artifact_view', key='wp12a_table') }}">
+            Ver resultados
+            <span>→</span>
+          </a>
+        </li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <h3>WP-12B · Anexo B</h3>
+      <p>Robustez de liquidez del bono basada en datos históricos SND.</p>
+
+      <p>
+        <span class="badge annex">Anexo B</span>
+      </p>
+
+      <ul class="link-list">
+        <li>
+          <a href="{{ url_for('artifact_view', key='wp12b_table') }}">
+            Ver resultados
+            <span>→</span>
+          </a>
+        </li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <h3>WP-07 · Sensibilidad DK</h3>
+      <p>Chequeos de sensibilidad del bandwidth de Driscoll–Kraay.</p>
+
+      <ul class="link-list">
+        <li>
+          <a href="{{ url_for('artifact_view', key='wp07_table') }}">
+            Ver resultados
+            <span>→</span>
+          </a>
+        </li>
+      </ul>
+    </article>
+
+    <article class="card wide">
+      <h3>Inventario econométrico completo</h3>
+      <p>
+        Acceso centralizado a tablas, `.do`, `.log`, auditorías,
+        CSV auxiliares y panel de entrada.
+      </p>
+
+      <ul class="link-list">
+        <li>
+          <a href="{{ url_for('econometrics') }}">
+            Abrir Econometría / Stata
+            <span>→</span>
+          </a>
+        </li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+
+<section id="reproducibilidad" class="dashboard-section">
+  <div class="section-heading">
+    <div>
+      <h2>6. Documentación y reproducibilidad</h2>
+      <p>Trazabilidad de datos, artefactos y resultados congelados.</p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <article class="card wide">
+      <h3>Principio de reproducibilidad</h3>
+      <p>
+        Las páginas de econometría muestran archivos ya producidos por el pipeline.
+        El dashboard no ejecuta Stata ni reestima especificaciones al abrir una página.
+      </p>
+
+      <p>
+        Esto permite que el jurado inspeccione exactamente los inputs, scripts,
+        logs y outputs utilizados en la versión final.
       </p>
     </article>
 
-    <aside class="card span-5">
-      <h3>Determinantes y canales</h3>
-      <ul class="list">
-        <li><strong>Globales:</strong> liquidez internacional, tasas externas, apetito por riesgo, shocks externos.</li>
-        <li><strong>Soberanos:</strong> riesgo país, curva de referência, credibilidade fiscal e monetária.</li>
-        <li><strong>Macroeconômicos:</strong> inflação, brecha del producto, tipo de cambio, prima de plazo.</li>
-        <li><strong>Idiosincráticos:</strong> riesgo de firma, sector, duración, covenants, liquidez del bono.</li>
-      </ul>
-      <p class="muted">
-        Hipótesis: shocks globales y soberanos afectan el nivel de spreads; los factores macro locales ajustan pendiente y curvatura.
-      </p>
-    </aside>
-
-    <section class="card span-6">
-      <h3>Nota metodológica</h3>
+        <article class="card wide">
+      <h3>Transparencia de datos y figuras</h3>
       <p>
-        El modelo utiliza <em>yields</em> ponto en el tiempo y factores estructurales para analizar la sensibilidad de los spreads.
-        Cubre eventos de crisis, reformas estructurales y el desarrollo del mercado corporativo en reales.
+        Trazabilidad variable por variable, archivos fuente, scripts,
+        hashes de verificación y galería de las figuras incorporadas
+        en la tesis.
       </p>
-    </section>
 
-    <section class="card span-6">
-      <h3>Log de Filtragem – DI</h3>
-      <pre style="font-size: 0.95rem; background: #0f172a; color: #e5e7eb; padding: 12px; border-radius: 10px;">
-    {{ logs_di }}
-      </pre>
-    </section>
+      <ul class="link-list">
+        <li>
+          <a href="{{ url_for('transparency') }}">
+            Abrir transparencia y trazabilidad
+            <span>→</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('spread_transparency') }}">
+            Auditoría de la variable dependiente
+            <span>→</span>
+          </a>
+        </li>
+      </ul>
+    </article>
 
-    <section class="card span-6">
-      <h3>Log de Filtragem – IPCA</h3>
-      <pre style="font-size: 0.95rem; background: #0f172a; color: #e5e7eb; padding: 12px; border-radius: 10px;">
-    {{ logs_ipca }}
-      </pre>
-    </section>
+<article class="card wide">
+      <h3>Jerarquía de resultados</h3>
 
-    <p>No todos los bonos aparecen en el informe final de spreads calculados. Esto puede ocurrir debido a:</p>
-      <ol>
-          <li>Falta de liquidez o de datos de yield en <code>ya.xlsx</code> en el período de observación</li>
-          <li>Ausencia de curva DI/WLA para la fecha correspondiente</li>
-          <li>Spreads extremos (fuera del intervalo [-10, 10])</li>
-          <li>Problemas en la interpolación (tenor_bucket ausente, ventana insuficiente, etc.)</li>
-      </ol>
-    <p>Como resultado, la hoja final contiene únicamente las observaciones válidas.</p>
-
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Bloque</th>
+              <th>Rol</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>WP-12C</td>
+              <td>Tabla principal M1–M8</td>
+            </tr>
+            <tr>
+              <td>WP-12A</td>
+              <td>Anexo A · robustez de leverage</td>
+            </tr>
+            <tr>
+              <td>WP-12B</td>
+              <td>Anexo B · robustez de liquidez SND</td>
+            </tr>
+            <tr>
+              <td>WP-07</td>
+              <td>Diagnóstico de sensibilidad Driscoll–Kraay</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
   </div>
-</main>
+</section>
 
-<footer>
-  · Proyecto académico · Brasil – Spreads corporativos (BRL)
+
+<footer class="footer">
+  Tesis de Maestría en Economía · FCE-UBA · Brasil · 2010–2025
 </footer>
 {% endblock %}
+
