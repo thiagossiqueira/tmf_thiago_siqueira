@@ -198,83 +198,106 @@
   <div class="section-heading">
     <div>
       <h2>3. Soberano y riesgo Brasil</h2>
-      <p>Curvas soberanas en BRL y matching por tenor e indexación.</p>
+      <p>
+        Construcci?n de la variable de riesgo soberano en BRL:
+        instrumentos nominales, curvas cero y matching por tenor.
+      </p>
     </div>
   </div>
 
   <div class="card-grid">
+
     <article class="card">
-      <h3>Benchmark soberano consolidado</h3>
+      <h3>Instrumentos soberanos nominales ? LTN + NTN-F</h3>
       <p>
-        Resumen de los instrumentos soberanos utilizados en la construcción
-        de las curvas nominal y real.
+        Entradas soberanas nominales utilizadas antes del bootstrap.
+        Las LTN aportan nodos cero directos y las NTN-F incorporan
+        flujos de cupones semestrales.
       </p>
 
       <ul class="link-list">
-        {% if status.sov_benchmark_summary %}
+        {% if status.brl_risk_inputs %}
         <li>
-          <a href="{{ url_for('sov_benchmark_summary') }}">
-            Abrir resumen soberano
-            <span>→</span>
+          <a href="{{ url_for('brl_risk_sovereign_inputs') }}">
+            Ver instrumentos y cobertura del bootstrap
+            <span>?</span>
           </a>
         </li>
         {% else %}
         <li>
           <span class="disabled-link">
-            Resumen soberano
-            <span>No disponible</span>
-          </span>
-        </li>
-        {% endif %}
-
-        {% if not public_deployment %}
-<li>
-          <a href="{{ url_for('download_govt_all') }}">
-            Descargar consolidado soberano
-            <span>↓</span>
-          </a>
-        </li>
-        {% endif %}
-      </ul>
-    </article>
-
-    <article class="card">
-      <h3>Curva soberana real</h3>
-      <p>NTN-B y referencias reales utilizadas para el matching por tenor.</p>
-
-      <ul class="link-list">
-        {% if status.sov_ipca_surface %}
-        <li>
-          <a href="{{ url_for('sov_surface', prefixo='ipca') }}">
-            Superficie soberana real
-            <span>→</span>
-          </a>
-        </li>
-        {% else %}
-        <li>
-          <span class="disabled-link">
-            Superficie soberana real
+            Instrumentos LTN + NTN-F
             <span>Artefacto no generado</span>
           </span>
         </li>
         {% endif %}
+      </ul>
+    </article>
 
-        {% if status.sov_ipca_spread %}
+
+    <article class="card">
+      <h3>Curva soberana cero BRL</h3>
+      <p>
+        Curva cero-cup?n soberana obtenida mediante bootstrap BUS/252.
+        Las NTN-F se convierten a nodos cero mediante stripping de sus
+        flujos de intereses y principal.
+      </p>
+
+      <ul class="link-list">
+        {% if status.brl_risk_zero %}
         <li>
-          <a href="{{ url_for('sov_spread', prefixo='ipca') }}">
-            Spread soberano real
-            <span>→</span>
+          <a href="{{ url_for('brl_risk_sovereign_zero') }}">
+            Superficie soberana cero post-bootstrap
+            <span>?</span>
           </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Curva soberana cero BRL
+            <span>Artefacto no generado</span>
+          </span>
         </li>
         {% endif %}
       </ul>
     </article>
 
+
+    <article class="card">
+      <h3>Curva DI nominal de referencia</h3>
+      <p>
+        Benchmark nominal construido con DI-over, futuros DI l?quidos
+        y swaps Pr? ? DI. La transici?n entre futuros y swaps es
+        din?mica seg?n la ?ltima madurez disponible de futuros en
+        cada fecha.
+      </p>
+
+      <ul class="link-list">
+        {% if status.di_surface %}
+        <li>
+          <a href="{{ url_for('surface', tipo='di') }}">
+            Superficie de la curva DI nominal
+            <span>?</span>
+          </a>
+        </li>
+        {% else %}
+        <li>
+          <span class="disabled-link">
+            Curva DI nominal
+            <span>Artefacto no generado</span>
+          </span>
+        </li>
+        {% endif %}
+      </ul>
+    </article>
+
+
     <article class="card">
       <h3>Spread soberano BRL por tenor</h3>
       <p>
-        Medida de riesgo soberano construida en moneda local y emparejada por tenor.
-        No se interpreta como un CDS contractual.
+        Diferencia geom?trica entre la curva cero soberana BRL y la
+        curva DI al mismo tenor. Medida de riesgo soberano construida
+        en moneda local. No se interpreta como un CDS contractual.
       </p>
 
       <ul class="link-list">
@@ -282,7 +305,7 @@
         <li>
           <a href="{{ url_for('brl_risk_surface') }}">
             Superficie del spread soberano BRL
-            <span>→</span>
+            <span>?</span>
           </a>
         </li>
         {% else %}
@@ -298,12 +321,13 @@
         <li>
           <a href="{{ url_for('brl_risk_table') }}">
             Tabla del spread soberano BRL
-            <span>→</span>
+            <span>?</span>
           </a>
         </li>
         {% endif %}
       </ul>
     </article>
+
   </div>
 </section>
 

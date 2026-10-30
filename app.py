@@ -45,8 +45,18 @@ def index():
         "sov_ipca_spread": os.path.exists("templates/govt_ipca_spread_surface.html"),
         "sov_benchmark_summary": os.path.exists("templates/govt_benchmark_summary_table.html"),
 
-        "brl_risk_surface": os.path.exists("templates/brl_risk_spread_surface.html"),
-        "brl_risk_table": os.path.exists("templates/brl_risk_summary.html"),
+        "brl_risk_inputs": os.path.exists(
+            "templates/brl_risk_sovereign_inputs.html"
+        ),
+        "brl_risk_zero": os.path.exists(
+            "templates/brl_risk_sovereign_zero.html"
+        ),
+        "brl_risk_surface": os.path.exists(
+            "templates/brl_risk_spread_surface.html"
+        ),
+        "brl_risk_table": os.path.exists(
+            "templates/brl_risk_summary.html"
+        ),
 
         "corp_summary": os.path.exists("data/corp_bonds_summary.xlsx"),
         "panel_input": os.path.exists(
@@ -246,6 +256,20 @@ def download_govt_all():
         download_name="govt_bonds_all_consolidated.xlsx",
         as_attachment=True,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+# --- Backing de la variable soberana BRL ---
+@app.route("/brl-risk/sovereign-inputs")
+def brl_risk_sovereign_inputs():
+    return send_file(
+        "templates/brl_risk_sovereign_inputs.html"
+    )
+
+
+@app.route("/brl-risk/sovereign-zero")
+def brl_risk_sovereign_zero():
+    return send_file(
+        "templates/brl_risk_sovereign_zero.html"
     )
 
 # --- Spread soberano BRL por tenor ---

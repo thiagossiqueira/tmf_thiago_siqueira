@@ -29,6 +29,15 @@ from src.utils.interpolation import interpolate_raw_di_yield_for_tenor
 
 HTML_OUT = Path("templates/brl_risk_spread_surface.html")
 SUMMARY_OUT = Path("templates/brl_risk_summary.html")
+
+SOV_INPUTS_OUT = Path(
+    "templates/brl_risk_sovereign_inputs.html"
+)
+
+SOV_ZERO_OUT = Path(
+    "templates/brl_risk_sovereign_zero.html"
+)
+
 XLSX_OUT = Path(
     "data/brl_sovereign_spread_surface_with_provenance.xlsx"
 )
@@ -587,6 +596,92 @@ def build_dashboard_data():
                 <= di_max
             )
 
+            sovereign_zero_pct = np.nan
+            di_zero_pct = np.nan
+
+            sovereign_method = None
+            di_method = None
+
+            # --------------------------------------------
+            # Sovereign zero leg
+            # --------------------------------------------
+            if sovereign_supported:
+                if exact_node_status(
+                    sov_nodes,
+                    target,
+                ):
+                    nearest_pos = int(
+                        np.argmin(
+                            np.abs(
+                                sov_nodes - target
+                            )
+                        )
+                    )
+
+                    sovereign_zero_dec = float(
+                        zero_curve.iloc[
+                            nearest_pos
+                        ]
+                    )
+
+                    sovereign_method = (
+                        "nodo zero soberano"
+                    )
+
+                else:
+                    sovereign_zero_dec = float(
+                        flat_forward_interpolation(
+                            target,
+                            zero_curve,
+                        )
+                    )
+
+                    sovereign_method = (
+                        "soberano interpolado"
+                    )
+
+                sovereign_zero_pct = (
+                    sovereign_zero_dec * 100.0
+                )
+
+                sovereign_yield.loc[
+                    obs_date,
+                    target,
+                ] = sovereign_zero_pct
+
+            # --------------------------------------------
+            # DI zero leg
+            # --------------------------------------------
+            if di_supported:
+                di_zero_pct = (
+                    interpolate_raw_di_yield_for_tenor(
+                        surface=di_surface,
+                        obs_date=obs_date,
+                        target_tenor=target,
+                    )
+                )
+
+                if pd.isna(di_zero_pct):
+                    di_supported = False
+
+                else:
+                    di_method = (
+                        "nodo DI"
+                        if exact_node_status(
+                            di_nodes,
+                            target,
+                        )
+                        else "DI interpolado"
+                    )
+
+                    di_yield.loc[
+                        obs_date,
+                        target,
+                    ] = di_zero_pct
+
+            # --------------------------------------------
+            # Spread requires simultaneous support
+            # --------------------------------------------
             if not (
                 sovereign_supported
                 and di_supported
@@ -613,64 +708,6 @@ def build_dashboard_data():
 
                 continue
 
-            if exact_node_status(
-                sov_nodes,
-                target,
-            ):
-                nearest_pos = int(
-                    np.argmin(
-                        np.abs(
-                            sov_nodes
-                            - target
-                        )
-                    )
-                )
-
-                sovereign_zero_dec = float(
-                    zero_curve.iloc[
-                        nearest_pos
-                    ]
-                )
-
-                sovereign_method = (
-                    "nodo zero soberano"
-                )
-
-            else:
-                sovereign_zero_dec = float(
-                    flat_forward_interpolation(
-                        target,
-                        zero_curve,
-                    )
-                )
-
-                sovereign_method = (
-                    "soberano interpolado"
-                )
-
-            sovereign_zero_pct = (
-                sovereign_zero_dec
-                * 100.0
-            )
-
-            di_zero_pct = (
-                interpolate_raw_di_yield_for_tenor(
-                    surface=di_surface,
-                    obs_date=obs_date,
-                    target_tenor=target,
-                )
-            )
-
-            if pd.isna(di_zero_pct):
-                provenance.loc[
-                    obs_date,
-                    target,
-                ] = (
-                    "Sin curva DI válida "
-                    "en la fecha"
-                )
-                continue
-
             spread_bps = (
                 geometric_spread_bps_from_pct(
                     corporate_yield_pct=(
@@ -681,25 +718,6 @@ def build_dashboard_data():
                     ),
                 )
             )
-
-            di_method = (
-                "nodo DI"
-                if exact_node_status(
-                    di_nodes,
-                    target,
-                )
-                else "DI interpolado"
-            )
-
-            sovereign_yield.loc[
-                obs_date,
-                target,
-            ] = sovereign_zero_pct
-
-            di_yield.loc[
-                obs_date,
-                target,
-            ] = di_zero_pct
 
             spread.loc[
                 obs_date,
@@ -1296,6 +1314,344 @@ def build_summary_html(
     )
 
 
+
+def build_sovereign_inputs_html(
+    support,
+):
+    display = support.sort_values(
+        "obs_date",
+        ascending=False,
+    ).copy()
+
+    rows = []
+
+    for _, row in display.iterrows():
+        obs_date = pd.Timestamp(
+            row["obs_date"]
+        ).strftime("%Y-%m-%d")
+
+        rows.append(
+            "<tr>"
+            f"<td>{obs_date}</td>"
+            f"<td>{int(row['sovereign_raw_inputs'])}</td>"
+            f"<td>{int(row['used_ltn'])}</td>"
+            f"<td>{int(row['used_ntnf'])}</td>"
+            f"<td>{int(row['sovereign_zero_nodes'])}</td>"
+            f"<td>{float(row['sovereign_min_tenor']):.2f}</td>"
+            f"<td>{float(row['sovereign_max_tenor']):.2f}</td>"
+            "</tr>"
+        )
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instrumentos soberanos nominales ? LTN + NTN-F</title>
+
+<style>
+body {{
+    font-family: Arial, sans-serif;
+    margin: 28px;
+    color: #17233c;
+    background: white;
+}}
+
+.lead {{
+    max-width: 1080px;
+    line-height: 1.6;
+    color: #52617d;
+}}
+
+.note {{
+    max-width: 1080px;
+    padding: 14px 16px;
+    margin: 20px 0;
+    background: #f5f7fb;
+    border-left: 4px solid #345fa8;
+    line-height: 1.55;
+}}
+
+table {{
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14px;
+}}
+
+th, td {{
+    padding: 9px 10px;
+    border-bottom: 1px solid #dfe5ef;
+    text-align: right;
+}}
+
+th:first-child,
+td:first-child {{
+    text-align: left;
+}}
+
+th {{
+    background: #f7f9fc;
+    position: sticky;
+    top: 0;
+}}
+</style>
+</head>
+
+<body>
+
+<h1>Instrumentos soberanos nominales ? LTN + NTN-F</h1>
+
+<p class="lead">
+Entradas utilizadas para construir la curva soberana nominal BRL
+antes del bootstrap. Las LTN son t?tulos zero-cup?n y funcionan como
+anclas cero directas. Las NTN-F pagan cupones semestrales y se
+incorporan mediante sus flujos de intereses y principal.
+</p>
+
+<div class="note">
+<strong>Convenci?n:</strong> BUS/252 con calendario ANBIMA.
+El bootstrap utiliza los instrumentos soberanos activos con
+rendimiento v?lido en cada fecha.
+<br><br>
+<strong>Nota de transparencia:</strong> los rendimientos
+instrumentales brutos y los archivos fuente licenciados no se
+publican en el despliegue p?blico. Esta p?gina muestra la composici?n
+efectivamente utilizada y la cobertura resultante. La curva cero
+derivada se presenta en el siguiente artefacto.
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Inputs observados</th>
+<th>LTN usadas</th>
+<th>NTN-F usadas</th>
+<th>Nodos cero</th>
+<th>Tenor m?n.</th>
+<th>Tenor m?x.</th>
+</tr>
+</thead>
+
+<tbody>
+{''.join(rows)}
+</tbody>
+</table>
+
+</body>
+</html>
+"""
+
+    SOV_INPUTS_OUT.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    SOV_INPUTS_OUT.write_text(
+        html,
+        encoding="utf-8",
+    )
+
+
+def build_sovereign_zero_html(
+    sovereign_yield,
+):
+    tenors = [
+        float(x)
+        for x in sovereign_yield.columns
+    ]
+
+    fig = go.Figure(
+        data=[
+            go.Surface(
+                x=tenors,
+                y=sovereign_yield.index,
+                z=sovereign_yield.to_numpy(
+                    dtype=float
+                ),
+                colorbar=dict(
+                    title="Yield cero (%)",
+                    len=0.72,
+                ),
+                hovertemplate=(
+                    "Plazo: %{x:g} a?os"
+                    "<br>Fecha: %{y|%Y-%m-%d}"
+                    "<br>Yield cero: %{z:.3f}%"
+                    "<extra></extra>"
+                ),
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title=(
+            "Curva soberana cero BRL ? "
+            "LTN + NTN-F post-bootstrap"
+        ),
+        scene=dict(
+            xaxis_title="Tenor (a?os)",
+            yaxis_title="Fecha",
+            zaxis_title="Yield cero (% a.a.)",
+        ),
+        margin=dict(
+            l=20,
+            r=100,
+            b=20,
+            t=75,
+        ),
+        paper_bgcolor="white",
+    )
+
+    chart_html = pio.to_html(
+        fig,
+        full_html=False,
+        include_plotlyjs="cdn",
+        config={
+            "responsive": True,
+            "displaylogo": False,
+        },
+    )
+
+    coverage = (
+        sovereign_yield.notna()
+        .sum()
+        .rename("fechas_con_dato")
+        .to_frame()
+    )
+
+    coverage["total_fechas"] = len(
+        sovereign_yield
+    )
+
+    coverage["cobertura_pct"] = (
+        coverage["fechas_con_dato"]
+        / coverage["total_fechas"]
+        * 100.0
+    )
+
+    coverage_rows = []
+
+    for tenor, row in coverage.iterrows():
+        coverage_rows.append(
+            "<tr>"
+            f"<td>{float(tenor):g} a?os</td>"
+            f"<td>{int(row['fechas_con_dato'])}</td>"
+            f"<td>{int(row['total_fechas'])}</td>"
+            f"<td>{float(row['cobertura_pct']):.1f}%</td>"
+            "</tr>"
+        )
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curva soberana cero BRL</title>
+
+<style>
+body {{
+    font-family: Arial, sans-serif;
+    margin: 28px;
+    color: #17233c;
+    background: white;
+}}
+
+.lead {{
+    max-width: 1080px;
+    line-height: 1.6;
+    color: #52617d;
+}}
+
+.note {{
+    max-width: 1080px;
+    padding: 14px 16px;
+    margin: 20px 0;
+    background: #f5f7fb;
+    border-left: 4px solid #345fa8;
+    line-height: 1.55;
+}}
+
+.chart {{
+    width: 100%;
+    min-height: 650px;
+}}
+
+table {{
+    border-collapse: collapse;
+    min-width: 650px;
+    margin-top: 18px;
+}}
+
+th, td {{
+    padding: 9px 14px;
+    border-bottom: 1px solid #dfe5ef;
+    text-align: right;
+}}
+
+th:first-child,
+td:first-child {{
+    text-align: left;
+}}
+
+th {{
+    background: #f7f9fc;
+}}
+</style>
+</head>
+
+<body>
+
+<h1>Curva soberana cero BRL</h1>
+
+<p class="lead">
+Curva nominal zero-cup?n derivada de LTN y NTN-F para las fechas del
+panel final. Las LTN funcionan como anclas cero directas. Los cupones
+y el principal de las NTN-F se separan mediante bootstrap para obtener
+tasas cero comparables por tenor.
+</p>
+
+<div class="note">
+<strong>Metodolog?a:</strong> bootstrap BUS/252 con calendario ANBIMA.
+Esta es la pata soberana utilizada antes de compararla con la curva DI.
+<strong>No utiliza NTN-B ni WLA.</strong>
+</div>
+
+<div class="chart">
+{chart_html}
+</div>
+
+<h2>Cobertura por tenor est?ndar</h2>
+
+<table>
+<thead>
+<tr>
+<th>Tenor</th>
+<th>Fechas con dato</th>
+<th>Total fechas</th>
+<th>Cobertura</th>
+</tr>
+</thead>
+
+<tbody>
+{''.join(coverage_rows)}
+</tbody>
+</table>
+
+</body>
+</html>
+"""
+
+    SOV_ZERO_OUT.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    SOV_ZERO_OUT.write_text(
+        html,
+        encoding="utf-8",
+    )
+
+
 def export_workbook(
     spread,
     sovereign_yield,
@@ -1371,6 +1727,14 @@ def build_brl_sovereign_spread_dashboard():
         support=support,
     )
 
+    build_sovereign_inputs_html(
+        support=support,
+    )
+
+    build_sovereign_zero_html(
+        sovereign_yield=sovereign_yield,
+    )
+
     build_surface_html(
         spread=spread,
         provenance=provenance,
@@ -1379,6 +1743,16 @@ def build_brl_sovereign_spread_dashboard():
     build_summary_html(
         spread=spread,
         provenance=provenance,
+    )
+
+    print(
+        "BRL sovereign inputs page saved to "
+        f"{SOV_INPUTS_OUT}"
+    )
+
+    print(
+        "BRL sovereign zero surface saved to "
+        f"{SOV_ZERO_OUT}"
     )
 
     print(
