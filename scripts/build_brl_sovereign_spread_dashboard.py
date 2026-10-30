@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -1315,6 +1316,733 @@ def build_summary_html(
 
 
 
+
+def _public_instrument_type(
+    value,
+):
+    value = str(value)
+
+    if value == "NTNF":
+        return "NTN-F"
+
+    return value
+
+
+def build_sovereign_audit_tables():
+    panel_dates = load_final_panel_dates()
+
+    nominal, yas = (
+        load_nominal_sovereign_inputs()
+    )
+
+    yas.index = pd.to_datetime(
+        yas.index,
+        errors="raise",
+    ).normalize()
+
+    dc = DayCounts(
+        "bus/252",
+        calendar="cdr_anbima",
+    )
+
+    bootstrap_input_rows = []
+    cash_flow_rows = []
+    zero_node_rows = []
+
+    for obs_date in panel_dates:
+        obs_date = pd.Timestamp(
+            obs_date
+        ).normalize()
+
+        zero_curve, stats = (
+            build_sovereign_zero_curve(
+                obs_date=obs_date,
+                nominal=nominal,
+                yas=yas,
+                dc=dc,
+            )
+        )
+
+        if (
+            zero_curve is None
+            or zero_curve.empty
+        ):
+            continue
+
+        active = nominal[
+            nominal["ISSUE_DT"].le(
+                obs_date
+            )
+            & nominal["MATURITY"].gt(
+                obs_date
+            )
+        ].copy()
+
+        candidates = []
+
+        for _, bond in active.iterrows():
+            instrument_id = bond["id"]
+
+            if instrument_id not in yas.columns:
+                continue
+
+            ytm_pct = pd.to_numeric(
+                yas.at[
+                    obs_date,
+                    instrument_id,
+                ],
+                errors="coerce",
+            )
+
+            if (
+                pd.isna(ytm_pct)
+                or float(ytm_pct) == 0.0
+            ):
+                continue
+
+            candidates.append(
+                (
+                    bond,
+                    float(ytm_pct),
+                )
+            )
+
+        ltn_tenors = set()
+
+        for bond, _ in candidates:
+            if bond["TYPE"] != "LTN":
+                continue
+
+            payment_date = dc.following(
+                bond["MATURITY"].date()
+            )
+
+            ltn_tenors.add(
+                dc.tf(
+                    obs_date.date(),
+                    payment_date,
+                )
+            )
+
+        zero_tenors = (
+            zero_curve.index.to_numpy(
+                dtype=float
+            )
+        )
+
+        used_ltn = 0
+        used_ntnf = 0
+
+        date_cash_flow_rows = []
+
+        for bond, ytm_pct in candidates:
+            raw_type = str(
+                bond["TYPE"]
+            )
+
+            public_type = (
+                _public_instrument_type(
+                    raw_type
+                )
+            )
+
+            included = True
+            exclusion_reason = ""
+
+            coupon_pct = 0.0
+            frequency = np.nan
+
+            if raw_type == "LTN":
+                payment_dates = [
+                    dc.following(
+                        bond["MATURITY"].date()
+                    )
+                ]
+
+                cash_flow_values = [
+                    100.0
+                ]
+
+            else:
+                coupon_pct = pd.to_numeric(
+                    bond["CPN"],
+                    errors="coerce",
+                )
+
+                frequency = pd.to_numeric(
+                    bond["CPN_FREQ"],
+                    errors="coerce",
+                )
+
+                if (
+                    pd.isna(coupon_pct)
+                    or pd.isna(frequency)
+                ):
+                    raise AssertionError(
+                        "Missing NTN-F coupon metadata for "
+                        f"{bond['id']}."
+                    )
+
+                frequency = int(
+                    frequency
+                )
+
+                if frequency != 2:
+                    raise AssertionError(
+                        "Unexpected NTN-F coupon "
+                        f"frequency {frequency} "
+                        f"for {bond['id']}."
+                    )
+
+                coupon_cash_flow = (
+                    (
+                        1.0
+                        + float(coupon_pct)
+                        / 100.0
+                    )
+                    ** (
+                        1.0
+                        / frequency
+                    )
+                    - 1.0
+                ) * 100.0
+
+                expiry = (
+                    bond["MATURITY"].date()
+                )
+
+                payment_dates = [
+                    dc.following(expiry)
+                ]
+
+                payment_date = dc.workday(
+                    dc.eom(
+                        dc.following(
+                            expiry
+                        ),
+                        offset=-7,
+                    ),
+                    1,
+                )
+
+                while (
+                    payment_date
+                    > dc.following(
+                        obs_date.date()
+                    )
+                ):
+                    payment_dates.append(
+                        payment_date
+                    )
+
+                    payment_date = (
+                        dc.workday(
+                            dc.eom(
+                                payment_date,
+                                offset=-7,
+                            ),
+                            1,
+                        )
+                    )
+
+                payment_dates = sorted(
+                    payment_dates
+                )
+
+                cash_flow_values = [
+                    coupon_cash_flow
+                    for _ in payment_dates
+                ]
+
+                cash_flow_values[-1] += (
+                    100.0
+                )
+
+                if len(payment_dates) == 1:
+                    single_tenor = dc.tf(
+                        obs_date.date(),
+                        payment_dates[0],
+                    )
+
+                    if (
+                        single_tenor
+                        in ltn_tenors
+                    ):
+                        included = False
+
+                        exclusion_reason = (
+                            "NTN-F de un solo flujo "
+                            "duplicada por LTN en el "
+                            "mismo tenor BUS/252"
+                        )
+
+            maturity_payment_date = (
+                dc.following(
+                    bond["MATURITY"].date()
+                )
+            )
+
+            maturity_tenor = float(
+                dc.tf(
+                    obs_date.date(),
+                    maturity_payment_date,
+                )
+            )
+
+            nearest_position = int(
+                np.argmin(
+                    np.abs(
+                        zero_tenors
+                        - maturity_tenor
+                    )
+                )
+            )
+
+            exact_node = bool(
+                np.isclose(
+                    zero_tenors[
+                        nearest_position
+                    ],
+                    maturity_tenor,
+                    rtol=0.0,
+                    atol=1e-12,
+                )
+            )
+
+            if included:
+                if raw_type == "LTN":
+                    used_ltn += 1
+                else:
+                    used_ntnf += 1
+
+                if exact_node:
+                    zero_rate_pct = float(
+                        zero_curve.iloc[
+                            nearest_position
+                        ]
+                        * 100.0
+                    )
+
+                    zero_method = (
+                        "nodo cero exacto"
+                    )
+
+                else:
+                    zero_rate_pct = float(
+                        flat_forward_interpolation(
+                            maturity_tenor,
+                            zero_curve,
+                        )
+                        * 100.0
+                    )
+
+                    zero_method = (
+                        "interpolacion "
+                        "flat-forward"
+                    )
+
+                if (
+                    raw_type == "LTN"
+                    and exact_node
+                    and abs(
+                        zero_rate_pct
+                        - ytm_pct
+                    ) > 1e-10
+                ):
+                    raise AssertionError(
+                        "Exact LTN zero node does "
+                        "not equal observed YTM for "
+                        f"{bond['id']} on "
+                        f"{obs_date.date()}."
+                    )
+
+            else:
+                zero_rate_pct = np.nan
+                zero_method = "excluido"
+
+            flow_dates_text = " | ".join(
+                pd.Timestamp(
+                    payment_date
+                ).strftime("%Y-%m-%d")
+                for payment_date
+                in payment_dates
+            )
+
+            flow_values_text = " | ".join(
+                f"{float(value):.6f}"
+                for value
+                in cash_flow_values
+            )
+
+            bootstrap_input_rows.append(
+                {
+                    "obs_date": obs_date,
+                    "instrument_id": (
+                        bond["id"]
+                    ),
+                    "instrument_type": (
+                        public_type
+                    ),
+                    "issue_date": pd.Timestamp(
+                        bond["ISSUE_DT"]
+                    ),
+                    "maturity_date": pd.Timestamp(
+                        bond["MATURITY"]
+                    ),
+                    "maturity_tenor_bus252": (
+                        maturity_tenor
+                    ),
+                    "ytm_pre_bootstrap_pct": (
+                        ytm_pct
+                    ),
+                    "cupon_pct": float(
+                        coupon_pct
+                    ),
+                    "coupon_frequency": (
+                        frequency
+                    ),
+                    "remaining_cash_flows": (
+                        len(payment_dates)
+                    ),
+                    "first_cash_flow_date": (
+                        pd.Timestamp(
+                            min(
+                                payment_dates
+                            )
+                        )
+                    ),
+                    "last_cash_flow_date": (
+                        pd.Timestamp(
+                            max(
+                                payment_dates
+                            )
+                        )
+                    ),
+                    "cash_flow_dates": (
+                        flow_dates_text
+                    ),
+                    "cash_flow_values": (
+                        flow_values_text
+                    ),
+                    "included_in_bootstrap": (
+                        included
+                    ),
+                    "zero_rate_at_maturity_pct": (
+                        zero_rate_pct
+                    ),
+                    "zero_rate_method": (
+                        zero_method
+                    ),
+                    "exclusion_reason": (
+                        exclusion_reason
+                    ),
+                }
+            )
+
+            for (
+                payment_date,
+                cash_flow_value,
+            ) in zip(
+                payment_dates,
+                cash_flow_values,
+            ):
+                row = {
+                    "obs_date": obs_date,
+                    "instrument_id": (
+                        bond["id"]
+                    ),
+                    "instrument_type": (
+                        public_type
+                    ),
+                    "payment_date": (
+                        pd.Timestamp(
+                            payment_date
+                        )
+                    ),
+                    "payment_tenor_bus252": (
+                        float(
+                            dc.tf(
+                                obs_date.date(),
+                                payment_date,
+                            )
+                        )
+                    ),
+                    "cash_flow_value": (
+                        float(
+                            cash_flow_value
+                        )
+                    ),
+                    "included_in_bootstrap": (
+                        included
+                    ),
+                    "exclusion_reason": (
+                        exclusion_reason
+                    ),
+                }
+
+                date_cash_flow_rows.append(
+                    row
+                )
+
+                cash_flow_rows.append(
+                    row
+                )
+
+        if used_ltn != stats["used_ltn"]:
+            raise AssertionError(
+                "LTN audit count mismatch on "
+                f"{obs_date.date()}: "
+                f"{used_ltn} != "
+                f"{stats['used_ltn']}."
+            )
+
+        if used_ntnf != stats["used_ntnf"]:
+            raise AssertionError(
+                "NTN-F audit count mismatch on "
+                f"{obs_date.date()}: "
+                f"{used_ntnf} != "
+                f"{stats['used_ntnf']}."
+            )
+
+        included_flows = pd.DataFrame(
+            [
+                row
+                for row
+                in date_cash_flow_rows
+                if row[
+                    "included_in_bootstrap"
+                ]
+            ]
+        )
+
+        if included_flows.empty:
+            raise AssertionError(
+                "No included sovereign cash flows "
+                f"on {obs_date.date()}."
+            )
+
+        for tenor, rate_dec in (
+            zero_curve.items()
+        ):
+            tenor = float(tenor)
+
+            gaps = (
+                included_flows[
+                    "payment_tenor_bus252"
+                ]
+                .sub(tenor)
+                .abs()
+            )
+
+            minimum_gap = float(
+                gaps.min()
+            )
+
+            exact_mapping = (
+                minimum_gap < 1e-10
+            )
+
+            if exact_mapping:
+                matching = included_flows[
+                    np.isclose(
+                        included_flows[
+                            "payment_tenor_bus252"
+                        ],
+                        tenor,
+                        rtol=0.0,
+                        atol=1e-10,
+                    )
+                ].copy()
+
+            else:
+                nearest_index = (
+                    gaps.idxmin()
+                )
+
+                matching = included_flows.loc[
+                    [nearest_index]
+                ].copy()
+
+            node_dates = sorted(
+                {
+                    pd.Timestamp(
+                        value
+                    ).strftime("%Y-%m-%d")
+                    for value
+                    in matching[
+                        "payment_date"
+                    ]
+                }
+            )
+
+            source_instruments = sorted(
+                {
+                    str(value)
+                    for value
+                    in matching[
+                        "instrument_id"
+                    ]
+                }
+            )
+
+            source_types = sorted(
+                {
+                    str(value)
+                    for value
+                    in matching[
+                        "instrument_type"
+                    ]
+                }
+            )
+
+            zero_node_rows.append(
+                {
+                    "obs_date": obs_date,
+                    "node_date": (
+                        " | ".join(
+                            node_dates
+                        )
+                    ),
+                    "node_tenor_bus252": (
+                        tenor
+                    ),
+                    "zero_rate_pct": (
+                        float(rate_dec)
+                        * 100.0
+                    ),
+                    "instruments_with_flow": (
+                        " | ".join(
+                            source_instruments
+                        )
+                    ),
+                    "instrument_types": (
+                        " | ".join(
+                            source_types
+                        )
+                    ),
+                    "source_instrument_count": (
+                        len(
+                            source_instruments
+                        )
+                    ),
+                    "exact_date_mapping": (
+                        exact_mapping
+                    ),
+                    "tenor_mapping_gap": (
+                        minimum_gap
+                    ),
+                }
+            )
+
+    bootstrap_inputs = pd.DataFrame(
+        bootstrap_input_rows
+    ).sort_values(
+        [
+            "obs_date",
+            "instrument_type",
+            "maturity_date",
+            "instrument_id",
+        ]
+    )
+
+    cash_flows = pd.DataFrame(
+        cash_flow_rows
+    ).sort_values(
+        [
+            "obs_date",
+            "payment_date",
+            "instrument_type",
+            "instrument_id",
+        ]
+    )
+
+    zero_nodes = pd.DataFrame(
+        zero_node_rows
+    ).sort_values(
+        [
+            "obs_date",
+            "node_tenor_bus252",
+        ]
+    )
+
+    return (
+        bootstrap_inputs,
+        cash_flows,
+        zero_nodes,
+    )
+
+
+def _json_default(
+    value,
+):
+    if isinstance(
+        value,
+        np.generic,
+    ):
+        return value.item()
+
+    if isinstance(
+        value,
+        pd.Timestamp,
+    ):
+        return value.strftime(
+            "%Y-%m-%d"
+        )
+
+    raise TypeError(
+        f"Unsupported JSON type: "
+        f"{type(value)!r}"
+    )
+
+
+def _records_by_date(
+    frame,
+):
+    data = frame.copy()
+
+    date_columns = [
+        "obs_date",
+        "issue_date",
+        "maturity_date",
+        "first_cash_flow_date",
+        "last_cash_flow_date",
+    ]
+
+    for column in date_columns:
+        if column not in data.columns:
+            continue
+
+        data[column] = pd.to_datetime(
+            data[column],
+            errors="coerce",
+        ).dt.strftime("%Y-%m-%d")
+
+    data = (
+        data.astype(object)
+        .where(
+            pd.notna(data),
+            None,
+        )
+    )
+
+    result = {}
+
+    for obs_date, group in data.groupby(
+        "obs_date",
+        sort=True,
+    ):
+        result[str(obs_date)] = (
+            group.drop(
+                columns=["obs_date"]
+            )
+            .to_dict(
+                orient="records"
+            )
+        )
+
+    return result
+
+
 def build_sovereign_inputs_html(
     support,
 ):
@@ -1342,84 +2070,94 @@ def build_sovereign_inputs_html(
             "</tr>"
         )
 
-    html = f"""<!DOCTYPE html>
+    html = """<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Instrumentos soberanos nominales ? LTN + NTN-F</title>
+<meta name="viewport"
+      content="width=device-width, initial-scale=1">
+<title>
+Instrumentos soberanos nominales - LTN + NTN-F
+</title>
 
 <style>
-body {{
+body {
     font-family: Arial, sans-serif;
     margin: 28px;
     color: #17233c;
     background: white;
-}}
+}
 
-.lead {{
+.lead {
     max-width: 1080px;
     line-height: 1.6;
     color: #52617d;
-}}
+}
 
-.note {{
+.note {
     max-width: 1080px;
     padding: 14px 16px;
     margin: 20px 0;
     background: #f5f7fb;
     border-left: 4px solid #345fa8;
     line-height: 1.55;
-}}
+}
 
-table {{
+.table-wrap {
+    overflow-x: auto;
+}
+
+table {
     border-collapse: collapse;
     width: 100%;
     font-size: 14px;
-}}
+}
 
-th, td {{
+th,
+td {
     padding: 9px 10px;
     border-bottom: 1px solid #dfe5ef;
     text-align: right;
-}}
+    white-space: nowrap;
+}
 
 th:first-child,
-td:first-child {{
+td:first-child {
     text-align: left;
-}}
+}
 
-th {{
+th {
     background: #f7f9fc;
     position: sticky;
     top: 0;
-}}
+}
 </style>
 </head>
 
 <body>
 
-<h1>Instrumentos soberanos nominales ? LTN + NTN-F</h1>
+<h1>
+Instrumentos soberanos nominales - LTN + NTN-F
+</h1>
 
 <p class="lead">
-Entradas utilizadas para construir la curva soberana nominal BRL
-antes del bootstrap. Las LTN son t?tulos zero-cup?n y funcionan como
-anclas cero directas. Las NTN-F pagan cupones semestrales y se
-incorporan mediante sus flujos de intereses y principal.
+Entradas utilizadas para construir la curva soberana
+nominal BRL antes del bootstrap. Las LTN son titulos
+zero-cupon y funcionan como anclas cero directas.
+Las NTN-F pagan cupones semestrales y se incorporan
+mediante sus flujos de intereses y principal.
 </p>
 
 <div class="note">
-<strong>Convenci?n:</strong> BUS/252 con calendario ANBIMA.
-El bootstrap utiliza los instrumentos soberanos activos con
-rendimiento v?lido en cada fecha.
-<br><br>
-<strong>Nota de transparencia:</strong> los rendimientos
-instrumentales brutos y los archivos fuente licenciados no se
-publican en el despliegue p?blico. Esta p?gina muestra la composici?n
-efectivamente utilizada y la cobertura resultante. La curva cero
-derivada se presenta en el siguiente artefacto.
+<strong>Convencion:</strong>
+BUS/252 con calendario ANBIMA.
+El bootstrap utiliza los instrumentos soberanos activos
+con rendimiento valido en cada fecha.
+La pagina de curva cero presenta el detalle por
+instrumento, flujo y nodo para cada fecha de observacion.
 </div>
 
+<div class="table-wrap">
 <table>
 <thead>
 <tr>
@@ -1428,19 +2166,25 @@ derivada se presenta en el siguiente artefacto.
 <th>LTN usadas</th>
 <th>NTN-F usadas</th>
 <th>Nodos cero</th>
-<th>Tenor m?n.</th>
-<th>Tenor m?x.</th>
+<th>Tenor min.</th>
+<th>Tenor max.</th>
 </tr>
 </thead>
 
 <tbody>
-{''.join(rows)}
+__ROWS__
 </tbody>
 </table>
+</div>
 
 </body>
 </html>
 """
+
+    html = html.replace(
+        "__ROWS__",
+        "".join(rows),
+    )
 
     SOV_INPUTS_OUT.parent.mkdir(
         parents=True,
@@ -1455,28 +2199,34 @@ derivada se presenta en el siguiente artefacto.
 
 def build_sovereign_zero_html(
     sovereign_yield,
+    bootstrap_inputs,
+    zero_nodes,
 ):
     tenors = [
-        float(x)
-        for x in sovereign_yield.columns
+        float(value)
+        for value
+        in sovereign_yield.columns
     ]
 
     fig = go.Figure(
         data=[
             go.Surface(
-                x=tenors,
-                y=sovereign_yield.index,
                 z=sovereign_yield.to_numpy(
                     dtype=float
                 ),
+                x=tenors,
+                y=(
+                    sovereign_yield.index
+                    .astype(str)
+                ),
+                colorscale="Turbo",
                 colorbar=dict(
-                    title="Yield cero (%)",
-                    len=0.72,
+                    title="Tasa cero (%)",
                 ),
                 hovertemplate=(
-                    "Plazo: %{x:g} a?os"
-                    "<br>Fecha: %{y|%Y-%m-%d}"
-                    "<br>Yield cero: %{z:.3f}%"
+                    "Plazo: %{x:g} anos"
+                    "<br>Fecha: %{y}"
+                    "<br>Tasa cero: %{z:.3f}%"
                     "<extra></extra>"
                 ),
             )
@@ -1484,22 +2234,82 @@ def build_sovereign_zero_html(
     )
 
     fig.update_layout(
-        title=(
-            "Curva soberana cero BRL ? "
-            "LTN + NTN-F post-bootstrap"
+        title=dict(
+            text=(
+                "Curva soberana cero BRL - "
+                "LTN + NTN-F post-bootstrap"
+            ),
+            x=0.5,
+            xanchor="center",
+            y=0.96,
+            yanchor="top",
+            font=dict(
+                size=22
+            ),
         ),
         scene=dict(
-            xaxis_title="Tenor (a?os)",
-            yaxis_title="Fecha",
-            zaxis_title="Yield cero (% a.a.)",
+            xaxis=dict(
+                title=dict(
+                    text="Plazo (anos)",
+                    font=dict(
+                        size=14
+                    ),
+                ),
+                tickfont=dict(
+                    size=11
+                ),
+            ),
+            yaxis=dict(
+                title=dict(
+                    text="Fecha",
+                    font=dict(
+                        size=14
+                    ),
+                ),
+                tickfont=dict(
+                    size=11
+                ),
+            ),
+            zaxis=dict(
+                title=dict(
+                    text="Tasa cero (%)",
+                    font=dict(
+                        size=14
+                    ),
+                ),
+                tickfont=dict(
+                    size=11
+                ),
+            ),
+            camera=dict(
+                eye=dict(
+                    x=1.55,
+                    y=-1.75,
+                    z=1.05,
+                )
+            ),
+            aspectmode="manual",
+            aspectratio=dict(
+                x=1.15,
+                y=1.85,
+                z=0.85,
+            ),
+            domain=dict(
+                x=[0.02, 0.90],
+                y=[0.02, 0.92],
+            ),
         ),
+        height=820,
         margin=dict(
             l=20,
             r=100,
             b=20,
-            t=75,
+            t=70,
         ),
         paper_bgcolor="white",
+        font=dict(
+            size=12
+        ),
     )
 
     chart_html = pio.to_html(
@@ -1509,23 +2319,34 @@ def build_sovereign_zero_html(
         config={
             "responsive": True,
             "displaylogo": False,
+            "scrollZoom": True,
         },
     )
 
     coverage = (
         sovereign_yield.notna()
         .sum()
-        .rename("fechas_con_dato")
+        .rename(
+            "fechas_con_dato"
+        )
         .to_frame()
     )
 
-    coverage["total_fechas"] = len(
+    coverage[
+        "total_fechas"
+    ] = len(
         sovereign_yield
     )
 
-    coverage["cobertura_pct"] = (
-        coverage["fechas_con_dato"]
-        / coverage["total_fechas"]
+    coverage[
+        "cobertura_pct"
+    ] = (
+        coverage[
+            "fechas_con_dato"
+        ]
+        / coverage[
+            "total_fechas"
+        ]
         * 100.0
     )
 
@@ -1534,94 +2355,249 @@ def build_sovereign_zero_html(
     for tenor, row in coverage.iterrows():
         coverage_rows.append(
             "<tr>"
-            f"<td>{float(tenor):g} a?os</td>"
+            f"<td>{float(tenor):g} anos</td>"
             f"<td>{int(row['fechas_con_dato'])}</td>"
             f"<td>{int(row['total_fechas'])}</td>"
             f"<td>{float(row['cobertura_pct']):.1f}%</td>"
             "</tr>"
         )
 
-    html = f"""<!DOCTYPE html>
+    inputs_by_date = (
+        _records_by_date(
+            bootstrap_inputs
+        )
+    )
+
+    nodes_by_date = (
+        _records_by_date(
+            zero_nodes
+        )
+    )
+
+    dates = sorted(
+        set(inputs_by_date)
+        | set(nodes_by_date)
+    )
+
+    payload = {
+        "dates": dates,
+        "inputs": inputs_by_date,
+        "nodes": nodes_by_date,
+    }
+
+    audit_json = json.dumps(
+        payload,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        default=_json_default,
+    ).replace(
+        "</",
+        "<\\/",
+    )
+
+    html = """<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1">
 <title>Curva soberana cero BRL</title>
 
 <style>
-body {{
-    font-family: Arial, sans-serif;
-    margin: 28px;
-    color: #17233c;
-    background: white;
-}}
+body {
+    margin: 0;
+    padding: 24px;
+    background: #f4f6f8;
+    color: #172033;
+    font-family: Arial, Helvetica, sans-serif;
+}
 
-.lead {{
-    max-width: 1080px;
+.page {
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.panel {
+    background: white;
+    border: 1px solid #d9e0e7;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(16,24,40,.06);
+}
+
+.lead {
+    max-width: 1180px;
     line-height: 1.6;
     color: #52617d;
-}}
+}
 
-.note {{
-    max-width: 1080px;
-    padding: 14px 16px;
-    margin: 20px 0;
-    background: #f5f7fb;
-    border-left: 4px solid #345fa8;
+.note {
+    border-left: 4px solid #0b4f8a;
+    padding: 10px 12px;
+    margin: 18px 0;
+    background: #eef5fa;
+    color: #344054;
+    border-radius: 6px;
     line-height: 1.55;
-}}
+}
 
-.chart {{
+.chart-note {
+    margin: 10px 4px 2px;
+    padding: 10px 12px;
+    color: #475467;
+    background: #f8fafc;
+    border: 1px solid #e4e7ec;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.chart {
     width: 100%;
-    min-height: 650px;
-}}
+    min-height: 820px;
+}
 
-table {{
+.chart .plotly-graph-div {
+    min-height: 820px !important;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 22px 0 14px;
+}
+
+.controls label {
+    font-weight: 700;
+}
+
+.controls select {
+    padding: 8px 10px;
+    border: 1px solid #cbd4e2;
+    border-radius: 5px;
+    background: white;
+    min-width: 180px;
+}
+
+.counter {
+    color: #52617d;
+    font-size: 14px;
+}
+
+.table-wrap {
+    overflow-x: auto;
+    margin-bottom: 28px;
+    border: 1px solid #e1e6ef;
+    border-radius: 6px;
+}
+
+table {
     border-collapse: collapse;
-    min-width: 650px;
-    margin-top: 18px;
-}}
+    width: 100%;
+    font-size: 13px;
+}
 
-th, td {{
-    padding: 9px 14px;
-    border-bottom: 1px solid #dfe5ef;
+th,
+td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e1e6ef;
     text-align: right;
-}}
+    white-space: nowrap;
+    vertical-align: top;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background: #f7f9fc;
+    z-index: 1;
+}
 
 th:first-child,
-td:first-child {{
+td:first-child {
     text-align: left;
-}}
+}
 
-th {{
-    background: #f7f9fc;
-}}
+td.text {
+    text-align: left;
+    white-space: normal;
+    min-width: 180px;
+}
+
+td.flows {
+    text-align: left;
+    white-space: normal;
+    min-width: 320px;
+    line-height: 1.45;
+}
+
+.status-yes {
+    font-weight: 700;
+}
+
+.status-no {
+    font-weight: 700;
+}
+
+h2 {
+    margin-top: 34px;
+}
+
+.small {
+    color: #68758d;
+    font-size: 13px;
+    line-height: 1.5;
+}
 </style>
 </head>
 
 <body>
+<div class="page">
 
+<div class="panel">
 <h1>Curva soberana cero BRL</h1>
 
 <p class="lead">
-Curva nominal zero-cup?n derivada de LTN y NTN-F para las fechas del
-panel final. Las LTN funcionan como anclas cero directas. Los cupones
-y el principal de las NTN-F se separan mediante bootstrap para obtener
-tasas cero comparables por tenor.
+Curva nominal zero-cupon derivada de LTN y NTN-F.
+Las LTN funcionan como anclas cero directas.
+Los cupones y el principal de las NTN-F se separan
+mediante bootstrap para obtener tasas cero comparables
+por tenor.
 </p>
 
 <div class="note">
-<strong>Metodolog?a:</strong> bootstrap BUS/252 con calendario ANBIMA.
-Esta es la pata soberana utilizada antes de compararla con la curva DI.
-<strong>No utiliza NTN-B ni WLA.</strong>
+<strong>Metodologia:</strong>
+bootstrap BUS/252 con calendario ANBIMA.
+La tabla de instrumentos muestra la YTM observada antes
+del bootstrap y la tasa cero al vencimiento despues del
+bootstrap. Esta ultima no es una nueva YTM del titulo.
+La tabla de nodos contiene las tasas que forman la curva
+cero representada en el grafico.
+Esta construccion no utiliza NTN-B ni WLA.
+Los valores usados se muestran para auditoria; los
+archivos fuente originales no se distribuyen.
 </div>
 
 <div class="chart">
-{chart_html}
+__CHART__
 </div>
 
-<h2>Cobertura por tenor est?ndar</h2>
+<p class="chart-note">
+<strong>Nota:</strong>
+Los espacios sin superficie corresponden a combinaciones
+de fecha y tenor fuera del soporte observado de la curva
+soberana. No representan una tasa cero igual a cero.
+</p>
 
+</div>
+
+<div class="panel">
+<h2>Cobertura por tenor estandar</h2>
+
+<div class="table-wrap">
 <table>
 <thead>
 <tr>
@@ -1631,15 +2607,278 @@ Esta es la pata soberana utilizada antes de compararla con la curva DI.
 <th>Cobertura</th>
 </tr>
 </thead>
-
 <tbody>
-{''.join(coverage_rows)}
+__COVERAGE_ROWS__
 </tbody>
 </table>
+</div>
+</div>
 
+<div class="panel">
+<h2>Detalle de construccion por fecha</h2>
+
+<div class="controls">
+<label for="audit-date">
+Fecha de observacion:
+</label>
+
+<select id="audit-date"></select>
+
+<span class="counter"
+      id="instrument-counter"></span>
+
+<span class="counter"
+      id="node-counter"></span>
+</div>
+
+<p class="small">
+La primera tabla presenta los instrumentos y flujos
+antes del bootstrap, junto con la tasa cero obtenida
+al vencimiento. La segunda presenta los nodos
+post-bootstrap que forman la curva cero.
+</p>
+
+<h3>Instrumentos antes del bootstrap</h3>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Instrumento</th>
+<th>Tipo</th>
+<th>Emision</th>
+<th>Vencimiento</th>
+<th>Tenor BUS/252</th>
+<th>YTM pre-bootstrap (%)</th>
+<th>Cupon (%)</th>
+<th>Frecuencia</th>
+<th>Flujos restantes</th>
+<th>Fechas de flujos</th>
+<th>Valores de flujos</th>
+<th>Incluido</th>
+<th>Tasa cero al vencimiento (%)</th>
+<th>Metodo post-bootstrap</th>
+<th>Motivo de exclusion</th>
+</tr>
+</thead>
+
+<tbody id="instrument-body"></tbody>
+</table>
+</div>
+
+<h3>Nodos de la curva cero post-bootstrap</h3>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Fecha del nodo</th>
+<th>Tenor BUS/252</th>
+<th>Tasa cero (%)</th>
+<th>Instrumentos con flujo</th>
+<th>Tipos</th>
+<th>Cantidad</th>
+<th>Mapeo exacto</th>
+<th>Diferencia de tenor</th>
+</tr>
+</thead>
+
+<tbody id="node-body"></tbody>
+</table>
+</div>
+
+<script id="audit-data"
+        type="application/json">
+__AUDIT_JSON__
+</script>
+
+<script>
+const auditData = JSON.parse(
+    document.getElementById(
+        "audit-data"
+    ).textContent
+);
+
+const dateSelect = document.getElementById(
+    "audit-date"
+);
+
+const instrumentBody = document.getElementById(
+    "instrument-body"
+);
+
+const nodeBody = document.getElementById(
+    "node-body"
+);
+
+function escapeHtml(value) {
+    if (
+        value === null
+        || value === undefined
+    ) {
+        return "";
+    }
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function formatNumber(
+    value,
+    digits = 6
+) {
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        return "";
+    }
+
+    return Number(value).toFixed(
+        digits
+    );
+}
+
+function formatFrequency(value) {
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        return "";
+    }
+
+    return String(value);
+}
+
+function yesNo(value) {
+    return value ? "Si" : "No";
+}
+
+function renderTables() {
+    const date = dateSelect.value;
+
+    const instruments = (
+        auditData.inputs[date]
+        || []
+    );
+
+    const nodes = (
+        auditData.nodes[date]
+        || []
+    );
+
+    instrumentBody.innerHTML = instruments.map(
+        row => `
+<tr>
+<td>${escapeHtml(row.instrument_id)}</td>
+<td>${escapeHtml(row.instrument_type)}</td>
+<td>${escapeHtml(row.issue_date)}</td>
+<td>${escapeHtml(row.maturity_date)}</td>
+<td>${formatNumber(row.maturity_tenor_bus252)}</td>
+<td>${formatNumber(row.ytm_pre_bootstrap_pct)}</td>
+<td>${formatNumber(row.cupon_pct)}</td>
+<td>${escapeHtml(formatFrequency(row.coupon_frequency))}</td>
+<td>${escapeHtml(row.remaining_cash_flows)}</td>
+<td class="flows">${escapeHtml(row.cash_flow_dates)}</td>
+<td class="flows">${escapeHtml(row.cash_flow_values)}</td>
+<td class="${row.included_in_bootstrap
+    ? "status-yes"
+    : "status-no"}">${yesNo(row.included_in_bootstrap)}</td>
+<td>${formatNumber(row.zero_rate_at_maturity_pct)}</td>
+<td class="text">${escapeHtml(row.zero_rate_method)}</td>
+<td class="text">${escapeHtml(row.exclusion_reason)}</td>
+</tr>`
+    ).join("");
+
+    nodeBody.innerHTML = nodes.map(
+        row => `
+<tr>
+<td>${escapeHtml(row.node_date)}</td>
+<td>${formatNumber(row.node_tenor_bus252, 12)}</td>
+<td>${formatNumber(row.zero_rate_pct, 9)}</td>
+<td class="text">${escapeHtml(row.instruments_with_flow)}</td>
+<td>${escapeHtml(row.instrument_types)}</td>
+<td>${escapeHtml(row.source_instrument_count)}</td>
+<td>${yesNo(row.exact_date_mapping)}</td>
+<td>${formatNumber(row.tenor_mapping_gap, 12)}</td>
+</tr>`
+    ).join("");
+
+    document.getElementById(
+        "instrument-counter"
+    ).textContent = (
+        `${instruments.length} instrumentos`
+    );
+
+    document.getElementById(
+        "node-counter"
+    ).textContent = (
+        `${nodes.length} nodos cero`
+    );
+}
+
+auditData.dates
+    .slice()
+    .reverse()
+    .forEach(
+        date => {
+            const option = document.createElement(
+                "option"
+            );
+
+            option.value = date;
+            option.textContent = date;
+
+            dateSelect.appendChild(
+                option
+            );
+        }
+    );
+
+if (auditData.dates.length > 0) {
+    dateSelect.value = (
+        auditData.dates[
+            auditData.dates.length - 1
+        ]
+    );
+}
+
+dateSelect.addEventListener(
+    "change",
+    renderTables
+);
+
+renderTables();
+</script>
+
+</div>
+</div>
 </body>
 </html>
 """
+
+    html = (
+        html.replace(
+            "__CHART__",
+            chart_html,
+        )
+        .replace(
+            "__COVERAGE_ROWS__",
+            "".join(
+                coverage_rows
+            ),
+        )
+        .replace(
+            "__AUDIT_JSON__",
+            audit_json,
+        )
+    )
 
     SOV_ZERO_OUT.parent.mkdir(
         parents=True,
@@ -1658,6 +2897,9 @@ def export_workbook(
     di_yield,
     provenance,
     support,
+    bootstrap_inputs,
+    cash_flows,
+    zero_nodes,
 ):
     XLSX_OUT.parent.mkdir(
         parents=True,
@@ -1704,6 +2946,24 @@ def export_workbook(
             index=False,
         )
 
+        bootstrap_inputs.to_excel(
+            writer,
+            sheet_name="bootstrap_inputs",
+            index=False,
+        )
+
+        cash_flows.to_excel(
+            writer,
+            sheet_name="cash_flows",
+            index=False,
+        )
+
+        zero_nodes.to_excel(
+            writer,
+            sheet_name="zero_nodes",
+            index=False,
+        )
+
 
 def build_brl_sovereign_spread_dashboard():
     (
@@ -1719,12 +2979,21 @@ def build_brl_sovereign_spread_dashboard():
             "BRL sovereign spread surface is empty."
         )
 
+    (
+        bootstrap_inputs,
+        cash_flows,
+        zero_nodes,
+    ) = build_sovereign_audit_tables()
+
     export_workbook(
         spread=spread,
         sovereign_yield=sovereign_yield,
         di_yield=di_yield,
         provenance=provenance,
         support=support,
+        bootstrap_inputs=bootstrap_inputs,
+        cash_flows=cash_flows,
+        zero_nodes=zero_nodes,
     )
 
     build_sovereign_inputs_html(
@@ -1733,6 +3002,8 @@ def build_brl_sovereign_spread_dashboard():
 
     build_sovereign_zero_html(
         sovereign_yield=sovereign_yield,
+        bootstrap_inputs=bootstrap_inputs,
+        zero_nodes=zero_nodes,
     )
 
     build_surface_html(
@@ -1743,6 +3014,13 @@ def build_brl_sovereign_spread_dashboard():
     build_summary_html(
         spread=spread,
         provenance=provenance,
+    )
+
+    print(
+        "BRL sovereign audit rows: "
+        f"{len(bootstrap_inputs)} inputs, "
+        f"{len(cash_flows)} cash flows, "
+        f"{len(zero_nodes)} zero nodes"
     )
 
     print(
