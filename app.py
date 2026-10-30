@@ -40,7 +40,7 @@ def index():
         "benchmark_summary": os.path.exists("templates/benchmark_summary_table.html"),
 
         "sov_di_surface": os.path.exists("templates/govt_di_surface.html"),
-        "sov_ipca_surface": os.path.exists("templates/govt_ipca_surface.html"),
+        "sov_ipca_surface": os.path.exists("templates/wla_ntnb_surface.html"),
         "sov_di_spread": os.path.exists("templates/govt_di_spread_surface.html"),
         "sov_ipca_spread": os.path.exists("templates/govt_ipca_spread_surface.html"),
         "sov_benchmark_summary": os.path.exists("templates/govt_benchmark_summary_table.html"),
@@ -191,7 +191,11 @@ def benchmark_summary():
 def sov_surface(prefixo):
     if prefixo not in ["di", "ipca"]:
         prefixo = "di"
-    return send_file(f"templates/govt_{prefixo}_surface.html")
+    # Backward-compatible alias: the canonical real sovereign
+    # surface is the audited WLA + NTN-B artifact.
+    if prefixo == "ipca":
+        return render_template("wla_ntnb_surface.html")
+    return send_file("templates/govt_di_surface.html")
 
 # Spread Charts (3D spread charts)
 @app.route("/sov_spread/<prefixo>")
